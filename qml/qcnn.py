@@ -1,6 +1,7 @@
 # qcnn
 import numpy as np
-import qiskit
+from qiskit import QuantumCircuit
+from qiskit import quantum_info as qi
 
 
 def b_mat(i, j, n):
@@ -35,20 +36,43 @@ def generate_gell_mann(order):
     return lst_of_gm_matricies
 
 
-class Qcnn:
+def update_active_qubits(active_qubits, group_len, target):
+    assert len(active_qubits) % group_len == 0
+    num_groups = int(len(active_qubits) / group_len)
+    update_qubits = []
+
+    for i in range(num_groups):
+        index = i*group_len + target
+        update_qubits.append(active_qubits[index])
+
+    return update_qubits
+
+
+class QcnnStruct:
 
     def __init__(self, num_qubits):
         self.inp = num_qubits
-        self.circ = qiskit.QuantumCircuit(num_qubits)
+        self.active_qubits = range(num_qubits)
 
-    def conv_layer(self):
+    def conv_layer(self, circ, params):
         return
 
-    def conv_spec4_layer(self):
+    def conv_spec4_layer(self, circ, params):
         return
 
-    def pooling_layer(self):
+    def pooling_layer(self, circ, group, target_ind, params):
+        assert self.inp % group == 0  # ensure that we can pool properly
         return
+
+    @staticmethod
+    def embedding(wf):
+        q_state = qi.Statevector(wf)
+        return q_state
+
+    @staticmethod
+    def get_operator(circ):
+        operator = qi.Operator(circ)
+        return operator
 
 
 def main():
@@ -56,6 +80,12 @@ def main():
     # for i in lst_gm_mat:
     #     print(i)
     #     print('\n')
+
+    # active_qs = [0, 1, 2, 3, 4, 5, 6, 7]
+    # group = 4
+    # target = 2
+    # print(active_qs)
+    # print(update_active_qubits(active_qs, group, target))
     return
 
 
