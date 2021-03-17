@@ -59,7 +59,7 @@ def update_active_qubits(active_qubits, group_len, target):
 def get_conv_op(mats, parms):
     final = np.zeros(mats[0].shape, dtype=np.complex128)
     for mat, parm in zip(mats, parms):
-        print(parm * mat)
+        # print(parm * mat)
         final += parm * mat
 
     return la.expm(complex(0, -1) * final)
@@ -68,6 +68,11 @@ def get_conv_op(mats, parms):
 def run_qcnn(num_qubits, parameters, wf):
     circ = QuantumCircuit(num_qubits)
     active_qubits = range(num_qubits)
+
+    # Embedding layer:
+    # wave_func = qi.Statevector(wf)
+    # circ.initialize(wave_func.data, list(active_qubits))
+    # circ.barrier()
 
     # 1st convolution layer:
     group_size = 4
@@ -84,13 +89,27 @@ def run_qcnn(num_qubits, parameters, wf):
             circ.unitary(U_conv, [index + 0, index + 3], label='U_1')
             circ.unitary(U_conv, [index + 0, index + 1], label='U_1')
             circ.unitary(U_conv, [index + 2, index + 3], label='U_1')
-            # circ.barrier()
+            circ.barrier()
 
     # 2nd - 4th convolution layers:
+    reg_conv_operators = generate_gell_mann(8)  # 3 qubit operators
+    reg_conv_parameters = [parameters[1], parameters[2], parameters[3]]
+    num_act_on_qubits = 3
+    for start_index in range(3):
+        u_conv = qi.Operator(get_conv_op(reg_conv_operators, reg_conv_operators[start_index]))
+        working_index = start_index
+        while working_index < len(active_qubits):
+            circ.unitary(u_conv, [working_index, working_index + 1, working_index + 2],
+                         label='U_{}'.format(start_index+2))
+            working_index += 3
+        circ.barrier()
 
-    wave_func = qi.Statevector(wf)
-    wave_func.evolve(circ)
-    return wave_func
+    # Embedding input wf
+    # wave_func = qi.Statevector(wf)
+    # print(wave_func.data)
+    # wave_func = wave_func.evolve(circ)
+
+    return circ
 
 
 def get_parms(num_params):
@@ -100,14 +119,23 @@ def get_parms(num_params):
 
 def main():
     gm_mats = generate_gell_mann(4)
+    gm_mats8 = generate_gell_mann(8)
+    num_8mats = len(gm_mats8)
     params = [get_parms(len(gm_mats))]
-    print(params)
-    wf = np.zeros(15)
+    params2 = get_parms(num_8mats)
+    params3 = get_parms(num_8mats)
+    params4 = get_parms(num_8mats)
+    params.append(params2)
+    params.append(params3)
+    params.append(params4)
+
+    # print(params)
+    wf = np.zeros(2**15)
     wf[0] = 1
 
-    circ = run_qcnn(15, params, wf)
+    new_wf = run_qcnn(15, params, wf)
     # circ.draw()
-    return circ
+    return new_wf
 
 
 if __name__ == "__main__":
