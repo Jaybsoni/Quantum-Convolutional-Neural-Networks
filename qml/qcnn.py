@@ -36,28 +36,23 @@ def generate_gell_mann(order):
     return lst_of_gm_matricies
 
 
-def update_active_qubits(active_qubits, group_len, target):
-    assert len(active_qubits) % group_len == 0
-    num_groups = int(len(active_qubits) / group_len)
-    update_qubits = []
-
-    for i in range(num_groups):
-        index = i*group_len + target
-        update_qubits.append(active_qubits[index])
-
-    return update_qubits
-
-
 class QcnnStruct:
 
     def __init__(self, num_qubits):
         self.inp = num_qubits
         self.active_qubits = range(num_qubits)
+        self.params = []
+        self.structure = []
 
-    def conv_layer(self, circ, params):
+    def add_layer(self, layer, parameterized_unitary):
+        self.structure.append(layer)
+
         return
 
-    def conv_spec4_layer(self, circ, params):
+    def conv_layer(self, params):
+        return
+
+    def conv_spec4_layer(self, params):
         return
 
     def pooling_layer(self, circ, group, target_ind, params):
@@ -73,6 +68,18 @@ class QcnnStruct:
     def get_operator(circ):
         operator = qi.Operator(circ)
         return operator
+
+    @staticmethod
+    def update_active_qubits(active_qubits, group_len, target):
+        assert len(active_qubits) % group_len == 0
+        num_groups = int(len(active_qubits) / group_len)
+        update_qubits = []
+
+        for i in range(num_groups):
+            index = i * group_len + target
+            update_qubits.append(active_qubits[index])
+
+        return update_qubits
 
 
 def main():
