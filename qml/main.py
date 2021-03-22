@@ -3,7 +3,7 @@ from qiskit import QuantumCircuit
 from qiskit import quantum_info as qi
 import matplotlib.pyplot as plt
 import scipy.linalg as la
-
+from pprint import pprint
 """
 In order to better understand the structure requred for the classes for implementing general QCNNs, I am going to code 
 out the particular example as described in the paper and then use it as a reference when designing the abstract classes. 
@@ -95,14 +95,31 @@ def run_qcnn(num_qubits, parameters, wf):
     reg_conv_operators = generate_gell_mann(8)  # 3 qubit operators
     reg_conv_parameters = [parameters[1], parameters[2], parameters[3]]
     num_act_on_qubits = 3
+
     for start_index in range(3):
-        u_conv = qi.Operator(get_conv_op(reg_conv_operators, reg_conv_operators[start_index]))
+        comb_conv_opt = get_conv_op(reg_conv_operators, reg_conv_parameters[start_index])
+        u_conv = qi.Operator(comb_conv_opt)
         working_index = start_index
-        while working_index < len(active_qubits):
+        while working_index + 2 < len(active_qubits):
+            print('start_index: {}, working_index: {}'.format(start_index, working_index))
+            # print(working_index)
             circ.unitary(u_conv, [working_index, working_index + 1, working_index + 2],
                          label='U_{}'.format(start_index+2))
             working_index += 3
         circ.barrier()
+
+    # Pooling layer:
+    pool_operators = generate_gell_mann(2)  # 1 qubit operators
+    pooling_params = [parameters[4], parameters[5]]
+    working_index = 0
+
+    while working_index + 2 < len(active_qubits):
+        v1 = get_conv_op(pool_operators, pooling_params[0])
+        v2 = get_conv_op(pool_operators, pooling_params[1])
+        v1_pool = qi.Operator(v1)
+        v2_pool = qi.Operator(v2)
+
+
 
     # Embedding input wf
     # wave_func = qi.Statevector(wf)
@@ -117,17 +134,31 @@ def get_parms(num_params):
     return params
 
 
+def compare_unitary(mat):
+    new_mat = np.matrix(mat)
+    c_t_mat = new_mat.H
+
+    resultant_mat = c_t_mat @ new_mat
+    # pprint('{}'.format(resultant_mat))
+    return
+
 def main():
     gm_mats = generate_gell_mann(4)
     gm_mats8 = generate_gell_mann(8)
+    gm_mats2 = generate_gell_mann(2)
+    num_2mats = len(gm_mats2)
     num_8mats = len(gm_mats8)
     params = [get_parms(len(gm_mats))]
     params2 = get_parms(num_8mats)
     params3 = get_parms(num_8mats)
     params4 = get_parms(num_8mats)
+    params5 = get_parms(num_2mats)
+    params6 = get_parms(num_2mats)
     params.append(params2)
     params.append(params3)
     params.append(params4)
+    params.append(params5)
+    params.append(params6)
 
     # print(params)
     wf = np.zeros(2**15)
