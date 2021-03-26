@@ -65,6 +65,16 @@ def get_conv_op(mats, parms):
     return la.expm(complex(0, -1) * final)
 
 
+def controlled_pool(mat):
+    i_hat = np.array([[1.0, 0.0],
+                      [0.0, 0.0]])
+    j_hat = np.array([[0.0, 0.0],
+                      [0.0, 1.0]])
+    identity = i_hat + j_hat
+
+    return np.kron(i_hat, identity) + np.kron(j_hat, mat)
+
+
 def run_qcnn(num_qubits, parameters, wf):
     circ = QuantumCircuit(num_qubits)
     active_qubits = range(num_qubits)
@@ -80,16 +90,21 @@ def run_qcnn(num_qubits, parameters, wf):
     conv_params = parameters[0]
     conv_operators = generate_gell_mann(4)  # 2 qubit operators
 
-    for index, qubit_index in enumerate(active_qubits):
-        if ((index+1) % apply_on_index == 0) and (index+1 < len(active_qubits)):
-            U_conv = qi.Operator(get_conv_op(conv_operators, conv_params))
-            circ.unitary(U_conv, [index + 1, index + 2], label='U_1')
-            circ.unitary(U_conv, [index + 1, index + 3], label='U_1')
-            circ.unitary(U_conv, [index + 0, index + 2], label='U_1')
-            circ.unitary(U_conv, [index + 0, index + 3], label='U_1')
-            circ.unitary(U_conv, [index + 0, index + 1], label='U_1')
-            circ.unitary(U_conv, [index + 2, index + 3], label='U_1')
-            circ.barrier()
+    index = 0
+    while index + 3 < len(active_qubits):
+        U_conv = qi.Operator(get_conv_op(conv_operators, conv_params))
+        circ.unitary(U_conv, [index + 1, index + 2], label='U_1')
+        circ.unitary(U_conv, [index + 1, index + 3], label='U_1')
+        circ.unitary(U_conv, [index + 0, index + 2], label='U_1')
+        circ.unitary(U_conv, [index + 0, index + 3], label='U_1')
+        circ.unitary(U_conv, [index + 0, index + 1], label='U_1')
+        circ.unitary(U_conv, [index + 2, index + 3], label='U_1')
+        circ.barrier()
+
+        if index == 0:
+            index += 2
+        else:
+            index += 3
 
     # 2nd - 4th convolution layers:
     reg_conv_operators = generate_gell_mann(8)  # 3 qubit operators
@@ -101,26 +116,30 @@ def run_qcnn(num_qubits, parameters, wf):
         u_conv = qi.Operator(comb_conv_opt)
         working_index = start_index
         while working_index + 2 < len(active_qubits):
-            print('start_index: {}, working_index: {}'.format(start_index, working_index))
+            # print('start_index: {}, working_index: {}'.format(start_index, working_index))
             # print(working_index)
             circ.unitary(u_conv, [working_index, working_index + 1, working_index + 2],
                          label='U_{}'.format(start_index+2))
             working_index += 3
         circ.barrier()
 
-    # Pooling layer:
+    # 1st Pooling layer:
     pool_operators = generate_gell_mann(2)  # 1 qubit operators
     pooling_params = [parameters[4], parameters[5]]
     working_index = 0
+    v1 = get_conv_op(pool_operators, pooling_params[0])
+    v2 = get_conv_op(pool_operators, pooling_params[1])
+    v1_pool = qi.Operator(controlled_pool(v1))
+    v2_pool = qi.Operator(controlled_pool(v2))
 
     while working_index + 2 < len(active_qubits):
-        v1 = get_conv_op(pool_operators, pooling_params[0])
-        v2 = get_conv_op(pool_operators, pooling_params[1])
-        v1_pool = qi.Operator(v1)
-        v2_pool = qi.Operator(v2)
+        circ.h(working_index)
+        circ.unitary(v1_pool, [working_index, working_index + 1], label='V1')
+        circ.h(working_index + 2)
+        circ.unitary(v2_pool, [working_index + 2, working_index + 1], label='V2')
+        working_index += 3
 
-
-
+    circ = circ.reverse_bits()
     # Embedding input wf
     # wave_func = qi.Statevector(wf)
     # print(wave_func.data)
@@ -141,6 +160,7 @@ def compare_unitary(mat):
     resultant_mat = c_t_mat @ new_mat
     # pprint('{}'.format(resultant_mat))
     return
+
 
 def main():
     gm_mats = generate_gell_mann(4)
