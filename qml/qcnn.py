@@ -1,4 +1,5 @@
 # qcnn
+import pickle
 import numpy as np
 from layers import legacy_conv4_layer, legacy_conv_layer, legacy_pool_layer
 from qiskit import QuantumCircuit
@@ -43,6 +44,18 @@ class QcnnStruct:
             update_qubits.append(active_qubits[index])
 
         return update_qubits
+
+    @staticmethod
+    def export_params(qcnn_struct, params):
+        with open('model.pkl', 'wb') as file:
+            pickle.dump((qcnn_struct, params), file)  # Save data as pickle
+
+    @staticmethod
+    def import_params():
+        with open('model.pkl', 'rb') as file:
+            qcnn_struct, params = pickle.load(file)  # Call load method to deserialze
+
+        return qcnn_struct, params
 
 
 def main():
