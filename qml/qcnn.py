@@ -1,62 +1,25 @@
 # qcnn
 import numpy as np
+from layers import legacy_conv4_layer, legacy_conv_layer, legacy_pool_layer
 from qiskit import QuantumCircuit
 from qiskit import quantum_info as qi
 
 
-def b_mat(i, j, n):
-    basis_matrix = np.zeros((n, n), dtype=np.float32)
-    basis_matrix[i, j] = 1.0
-
-    return basis_matrix
-
-
-def generate_gell_mann(order):
-    lst_of_gm_matricies = []
-    for k in range(order):
-        j = 0
-        while j < k:
-            sym_mat = b_mat(j, k, order) + b_mat(k, j, order)
-            anti_sym_mat = complex(0.0, -1.0) * (b_mat(j, k, order) - b_mat(k, j, order))
-
-            lst_of_gm_matricies.append(sym_mat), lst_of_gm_matricies.append(anti_sym_mat)
-            j += 1
-
-        if k < (order - 1):
-            n = k + 1
-            coeff = np.sqrt(2 / (n*(n+1)))
-
-            sum_diag = b_mat(0, 0, order)
-            for i in range(1, k+1):
-                sum_diag += b_mat(i, i, order)
-
-            diag_mat = coeff * (sum_diag - n*(b_mat(k+1, k+1, order)))
-            lst_of_gm_matricies.append(diag_mat)
-
-    return lst_of_gm_matricies
-
-
 class QcnnStruct:
+
+    Layers = {legacy_conv4_layer.name: legacy_conv4_layer,
+              legacy_conv_layer.name: legacy_conv_layer,
+              legacy_pool_layer.name: legacy_pool_layer}
 
     def __init__(self, num_qubits):
         self.inp = num_qubits
         self.active_qubits = range(num_qubits)
-        self.params = []
         self.structure = []
 
-    def add_layer(self, layer, parameterized_unitary):
-        self.structure.append(layer)
-
+    def add_layer(self, layer, ):
         return
 
-    def conv_layer(self, params):
-        return
-
-    def conv_spec4_layer(self, params):
-        return
-
-    def pooling_layer(self, circ, group, target_ind, params):
-        assert self.inp % group == 0  # ensure that we can pool properly
+    def get_params(self):
         return
 
     @staticmethod
@@ -83,16 +46,6 @@ class QcnnStruct:
 
 
 def main():
-    # lst_gm_mat = generate_gell_mann(3)
-    # for i in lst_gm_mat:
-    #     print(i)
-    #     print('\n')
-
-    # active_qs = [0, 1, 2, 3, 4, 5, 6, 7]
-    # group = 4
-    # target = 2
-    # print(active_qs)
-    # print(update_active_qubits(active_qs, group, target))
     return
 
 
