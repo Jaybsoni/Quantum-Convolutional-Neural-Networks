@@ -4,27 +4,9 @@ import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg as lng
 from functools import lru_cache, wraps
-
+from numba import jit
 
 def np_cache(*args, **kwargs):
-    """LRU cache implementation for functions whose FIRST parameter is a numpy array
-    >>> array = np.array([[1, 2, 3], [4, 5, 6]])
-    >>> @np_cache(maxsize=256)
-    ... def multiply(array, factor):
-    ...     print("Calculating...")
-    ...     return factor*array
-    >>> multiply(array, 2)
-    Calculating...
-    array([[ 2,  4,  6],
-           [ 8, 10, 12]])
-    >>> multiply(array, 2)
-    array([[ 2,  4,  6],
-           [ 8, 10, 12]])
-    >>> multiply.cache_info()
-    CacheInfo(hits=1, misses=1, maxsize=256, currsize=1)
-
-    """
-
     def decorator(function):
         @wraps(function)
         def wrapper(np_array, *args, **kwargs):
@@ -215,8 +197,6 @@ class HamiltonianSlow:
         return
 
 
-
-
 class HamiltonianFast:
     def __init__(self, n=2, h1_min=0, h1_max=1.6, h2_min=-1.6, h2_max=1.6):
         self.n = n
@@ -231,7 +211,7 @@ class HamiltonianFast:
         self.first_term = np.zeros(shape=(self.size, self.size), dtype=float)
         self.second_term = np.zeros(shape=(self.size, self.size), dtype=float)
         self.third_term = np.zeros(shape=(self.size, self.size), dtype=float)
-        print(self.first_term.shape)
+
         # Delete the output file if exists so we can append to a fresh one.
         self.filename = f'dataset_n={n}.txt'
         if os.path.isfile(self.filename):
@@ -295,8 +275,6 @@ class HamiltonianFast:
             percentage = (i / n) * 100
             print("{:0.2f}% \tElapsed: {} \tRemaining: {}".format(percentage, self.convert_sec(time.time() - t0), self.convert_sec(time_remaning)))
 
-
-
     def calculate_hamiltonian(self):
         s = time.time()
         self.get_first_term_fast()
@@ -305,39 +283,45 @@ class HamiltonianFast:
         print(time.time() - s)
 
         s = time.time()
-        i = 0
+        i = 1
         for h1 in np.linspace(self.h1_min, self.h1_max, self.h1_range):
             for h2 in np.linspace(self.h2_min, self.h2_max, self.h2_range):
-                i += 1
                 self.calculate_time_remaining(s, i)
+                i += 1
 
 
                 H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
+                # H = H.astype(complex)
 
-                # OLD
-                ww, vv = np.linalg.eig(H)
-                index = np.where(ww == np.amin(ww))
-
-                # New
-                w, v = sparse.linalg.eigs(H, k=100, which="SM")
-                index = np.where(w == np.amin(w))
-
-                print(len(vv[index][0]), len(v[index][0]))
-                print(vv[index][0])
-                print("_")
-                print(v[index][0])
+                eigenvectors = self.find_eigval(H.astype(complex))
 
                 # Write to file each time to avoid saving to ram
                 with open(self.filename, 'a+') as f:
-                    eigenvectors = v[index][0]
-
                     f.write(f"({h1},{h2})-[")
                     for line in eigenvectors:
                         f.write(str(line) + ", ")
                     f.write(f"]\n")
 
         print(f"added all terms in {time.time() - s} seconds")
-        return
+
+    @staticmethod
+    @jit(nopython=True)
+    def find_eigval(H):
+        # OLD
+        w, v = np.linalg.eig(H)
+        index = np.where(w == np.amin(w))
+
+        # New
+        # w, v = sparse.linalg.eigs(H, k=1022, which="SM")
+        # index = np.where(w == np.amin(w))
+
+        # print(len(vv[index][0]), len(v[index][0]))
+        # print(vv[index][0])
+        # print("_")
+        # print(v[index][0])
+        return v[index][0]
+
+
 
 #######################
 
@@ -347,6 +331,6 @@ class HamiltonianFast:
 
 
 s = time.time()
-H = HamiltonianFast(10, 0, 1.6, -1.6, 1.6).calculate_hamiltonian()
+H = HamiltonianFast(12, 0, 1.6, -1.6, 1.6).calculate_hamiltonian()
 print(find_kron.cache_info())
 print(f"Time for caching took {time.time() -s} seconds")
