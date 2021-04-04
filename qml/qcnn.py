@@ -44,7 +44,11 @@ class QcnnStruct:
 
     @staticmethod
     def get_updated_active_qubits(active_qubits, group_len, target):
-        assert len(active_qubits) % group_len == 0
+        # print(len(active_qubits))
+        # print(group_len)
+        # print(active_qubits)
+        ## FIX THIS !!!
+        # assert len(active_qubits) % group_len == 0
         num_groups = len(active_qubits) // group_len
         update_qubits = []
 
@@ -62,7 +66,7 @@ class QcnnStruct:
         self.active_qubits = list(range(self.num_qubits))
         return
 
-    def generate_circ(self):
+    def generate_circ(self, draw=False):
         circ = QuantumCircuit(self.num_qubits)
 
         for index, layer_info in enumerate(self.structure):
@@ -79,7 +83,12 @@ class QcnnStruct:
                 self.update_active_qubits(group_len, target)
 
         self.reset_active_qubits()
-        return circ.reverse_bits()  # swap to the convention found in textbooks
+        circ = circ.reverse_bits()  # swap to the convention found in textbooks
+
+        if draw:
+            circ.draw(reverse_bits=True)
+
+        return circ
 
     def get_final_state_active_qubits(self):
         active_qubits = self.active_qubits.copy()
@@ -128,7 +137,7 @@ class Qcnn(QcnnStruct):
         original_params = self.params.copy()
         gradient_mat = []
 
-        for layer_index, layer_params in self.params:
+        for layer_index, layer_params in enumerate(self.params):
             layer_grad = np.zeros(len(layer_params))
             for param_index, param in enumerate(layer_params):
                 self.params[layer_index][param_index] += epsilon   # shift param by epsilon
@@ -150,8 +159,10 @@ class Qcnn(QcnnStruct):
 
     def update_params(self, gradient_mat, learning_rate):
         for param_layer, grad_layer in zip(self.params, gradient_mat):
+            print(param_layer)
+            print(learning_rate)
+            print(grad_layer)
             param_layer -= learning_rate * grad_layer  # step in direction of -grad with size learning rate
-
         return
 
     def load_model(self, model_struct, specific_params):
@@ -174,7 +185,7 @@ class Qcnn(QcnnStruct):
         middle_qubit = final_active_qubits[middle_qubit_index]  # this is the index of the middle qubit
 
         operator_circ = QuantumCircuit(self.num_qubits)  # define the circuit for the operator we want to computer
-        operator_circ.x(middle_qubit_index)              # expectation value for
+        operator_circ.x(middle_qubit)                    # expectation value for
         operator_circ = operator_circ.reverse_bits()
 
         operator = qi.Operator(operator_circ)  # operator of interest

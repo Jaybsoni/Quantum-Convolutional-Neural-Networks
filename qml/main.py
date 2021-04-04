@@ -186,7 +186,8 @@ def main():
 
     new_wf = run_qcnn(15, params, wf)
     # circ.draw()
-    return new_wf
+
+    return
 
 
 if __name__ == "__main__":
