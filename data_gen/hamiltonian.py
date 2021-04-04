@@ -160,7 +160,7 @@ class HamiltonianFast:
 
 
                 H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
-                eigenvectors = self.find_eigval(H.astype(complex))
+                eigenvectors = self.find_eigval(H)
 
                 # Write to file each time to avoid saving to ram
                 with open(self.filename, 'a+') as f:
@@ -171,39 +171,96 @@ class HamiltonianFast:
         print(f"added all terms in {time.time() - s} seconds")
 
     @staticmethod
-    # @jit(nopython=True)
+    def find_eigval2(H):
+        b, c = sparse.linalg.eigsh(H, k=50, which='SM', tol=1e1)
+        return b
+        # print(b)
+
+    @staticmethod
     def find_eigval(H):
         # OLD
-        ww, vv = np.linalg.eig(H)
-        index = np.where(ww == np.amin(ww))
-        # print(H.shape)
-        # print(vv.shape)
-        # print(index[0][0])
-        # print(vv[index][0])
+        # ww, vv = np.linalg.eig(H)
+        # index = np.where(ww == np.amin(ww))
+        # npEigVal, npEigVec = ww[index], vv[:, index]
+        # # print(index, npEigVal)
+        # # print(npEigVec)
+        # print("------")
+        #
+        #
+        #
+        # """
+        # np.linalg.eig returns the eigenvalues and vectors of a matrix
+        # BUT, it returns a list of lists of lists, where the elements of
+        # each triple nested list is the first element of each eigenvector,
+        # not a list of eigenvectors like any sensical person would return.
+        # """ # np.linalg.eig is grade A stupid, change my mind...
+        # eigValsList = []  # Converts np.eig to an output that's actually usable
+        # for eigVal in range(len(ww[index])):
+        #     tempVec = []
+        #
+        #     for eigVec in range(len(vv[:, index])):
+        #         tempVec.append(vv[:, index][eigVec][0][eigVal])
+        #     eigValsList.append(np.array(tempVec))
+        #
+        # sum_vec = np.sum(eigValsList, axis=0)
 
 
-        # New
-        # w, v = sparse.linalg.eigs(H, k=512, which="SR")
-        # print(v.shape)
-        # index = np.where(w == np.amin(w))
-        # print(v[index][0])
-        # print(len(vv[index][0]), len(v[index][0]))
-        # print(vv[index][0])
-        # print("_")
-        # print(v[index][0])
-        return vv[index][0]
+
+        b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-16)
+        # print(c.flatten())
+        # print("fast 'wrong' method\n", b, c.flatten(), c.shape)
+        # print("Eigval:", b, "and is", np.isclose(b, npEigVal, 0.00001))
+
+
+        # slowVectMag  = sum_vec / np.linalg.norm(sum_vec)
+        # print(np.allclose((H@slowVectMag) / b, np.array(slowVectMag, dtype=complex), 1e-9))
+        # time.sleep(0.5)
+        # print("----")
+        # print(np.linalg.norm(sum_vec))
+        # print( np.linalg.norm(slowVectMag))
+        # print( np.linalg.norm(fastVecMag))
+        # print("-----")
+        #
+        #
+        # for x, y in zip(slowVectMag, fastVecMag):
+        #     print(x, y)
+        #
+        # time.sleep(1)
+
+        # print(fastVecMag, slowVectMag)
+
+        # for fastVec, slowVec in zip(fixed_c, vv[index][0]):
+        #     fastVec = np.round(fastVec)
+        #     slowVec = np.round(slowVec)
+        #     print(fastVec, slowVec)
+
+
+        # return(fixed_c)
+        # return npEigVec
+        return c
 
 
 
+# test = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+# testt = sparse.dia_matrix((np.array([1, 1, -1, 1]), np.array([0])), dtype=int, shape=(4, 4))
+#
+# ww, vv = np.linalg.eig(test)
+# index = np.where(ww == np.amin(ww))
+# print(ww[index][0], vv[index][0])
+# print("-")
+# b, c = sparse.linalg.eigsh(testt.asfptype(), k=1, which='SA', tol=1e-1)
+# print(int(b), np.array(np.round(c.flatten()), dtype=int))
+#
 
-# s = time.time()
-# H = HamiltonianFast(8, 0, 1.6, -1.6, 1.6).calculate_hamiltonian()
-# print(find_kron_faster.cache_info())
-# print(f"Time for caching took {time.time() -s} seconds")
+
+s = time.time()
+H = HamiltonianFast(8, 0, 1.6, -1.6, 1.6).calculate_hamiltonian()
+print(find_kron_faster.cache_info())
+print(f"Time for caching took {time.time() -s} seconds")
 
 
 ###
-new_n8 = np.loadtxt('dataset_n=8.txt', dtype=complex)
+new_n6 = np.loadtxt('dataset_n=6.txt', dtype=complex)
 
 with open('old_data_n8.pkl', 'rb') as file:
     old_n8 = pickle.load(file)  # Call load method to deserialze
@@ -217,7 +274,7 @@ with open('old_data_n8.txt', 'a+') as f:
     f.write("\n")
 
 
-for a, b in zip(old_n8[0][2][0], new_n8[0]):
+for a, b in zip(old_n8[0][2][0], new_n6[0]):
     print(a, b)
 
 
