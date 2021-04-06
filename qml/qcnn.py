@@ -3,7 +3,7 @@ import numpy as np
 from layers import legacy_conv4_layer, legacy_conv_layer, legacy_pool_layer
 from qiskit import QuantumCircuit
 from qiskit import quantum_info as qi
-
+import itertools
 
 class QcnnStruct:
 
@@ -178,20 +178,18 @@ class Qcnn(QcnnStruct):
         return loss / num_entries
 
     def middle_qubit_exp_value(self, state_vect):
-        final_active_qubits = self.get_final_state_active_qubits()
-        num_qubits = len(final_active_qubits)
-        middle_qubit_index = num_qubits // 2
+        final_active_qubits = self.get_final_state_active_qubits()   ### SLOW
+        num_qbits = len(final_active_qubits)
+        middle_qbit = final_active_qubits[num_qbits // 2]  # this is the index of the middle qubit
 
-        middle_qubit = final_active_qubits[middle_qubit_index]  # this is the index of the middle qubit
+        # the actual vector of a1, a2, ... , a2^n in np.array form
+        probability_vector = (np.abs(np.array(state_vect.data))) ** 2
 
-        operator_circ = QuantumCircuit(self.num_qubits)  # define the circuit for the operator we want to computer
-        operator_circ.x(middle_qubit)                    # expectation value for
-        operator_circ = operator_circ.reverse_bits()
+        all_binary_combs = list(map(list, itertools.product([0, 1], repeat=num_qbits)))
+        newLst = np.array([elem for elem, val in enumerate(all_binary_combs) if val[middle_qbit] == 1])
+        sums = np.sum(probability_vector[newLst])
 
-        operator = qi.Operator(operator_circ)  # operator of interest
-        exp_value = state_vect.expectation_value(operator)  # expectation value of X operator on middle qubit
-
-        return exp_value
+        return (-1 * sums) + (1 * (1 - sums))
 
 
 def main():
