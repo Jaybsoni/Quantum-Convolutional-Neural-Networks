@@ -159,9 +159,6 @@ class Qcnn(QcnnStruct):
 
     def update_params(self, gradient_mat, learning_rate):
         for param_layer, grad_layer in zip(self.params, gradient_mat):
-            print(param_layer)
-            print(learning_rate)
-            print(grad_layer)
             param_layer -= learning_rate * grad_layer  # step in direction of -grad with size learning rate
         return
 
