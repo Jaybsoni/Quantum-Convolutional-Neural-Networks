@@ -153,8 +153,10 @@ class Qcnn(QcnnStruct):
                 grad = 0
                 for i in [1, -1]:
                     self.params[layer_index][param_index] += i * epsilon  # shift params
-                    grad += i * self.mse_loss(self.forward(input_wfs, self.params.copy()), labels)
-                    self.params = original_params.copy()  # reset params to original values
+                    grad += i * self.mse_loss(self.forward(input_wfs, self.params), labels)
+                    # self.params = original_params.copy()  # reset params to original values
+                    self.params = copy.deepcopy(original_params)  # reset params to original values
+
                 layer_grad[param_index] = grad / 2 * epsilon
 
             gradient_mat.append(layer_grad)
@@ -165,10 +167,10 @@ class Qcnn(QcnnStruct):
         i, j = indexes
         grad = 0
 
-        for i in [1, -1]:
+        for k in [1, -1]:
             params = copy.deepcopy(self.params)
-            params[i][j] += i * epsilon  # shift params
-            grad += i * self.mse_loss(self.forward(input_wfs, params), labels)
+            params[i][j] += k * epsilon  # shift params
+            grad += k * self.mse_loss(self.forward(input_wfs, params), labels)
 
         layer_grad = grad / 2 * epsilon
         return i, j, layer_grad
