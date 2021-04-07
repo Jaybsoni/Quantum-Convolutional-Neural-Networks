@@ -68,14 +68,14 @@ class QcnnStruct:
         self.active_qubits = list(range(self.num_qubits))
         return
 
-    def generate_circ(self, draw=False):
+    def generate_circ(self, params, draw=False):
         circ = QuantumCircuit(self.num_qubits)
 
         for index, layer_info in enumerate(self.structure):
             layer_name, kwargs = layer_info
             layer = self.Layers[layer_name]
 
-            layer.apply_layer(circ, self.params[index], self.active_qubits, kwargs)
+            layer.apply_layer(circ, params[index], self.active_qubits, kwargs)
 
             if "update_active_qubits" in kwargs:
                 update_params_dict = kwargs["update_active_qubits"]
@@ -123,8 +123,8 @@ class Qcnn(QcnnStruct):
     def __init__(self, num_qubits):
         super().__init__(num_qubits)
 
-    def forward(self, input_wfs):
-        circ = self.generate_circ()
+    def forward(self, input_wfs, params):
+        circ = self.generate_circ(params)
         predictions = np.zeros(len(input_wfs))
 
         for index, wf in enumerate(input_wfs):
@@ -148,7 +148,7 @@ class Qcnn(QcnnStruct):
                 grad = 0
                 for i in [1, -1]:
                     self.params[layer_index][param_index] += i * epsilon  # shift params
-                    grad += i * self.mse_loss(self.forward(input_wfs), labels)
+                    grad += i * self.mse_loss(self.forward(input_wfs, self.params.copy()), labels)
                     self.params = original_params.copy()  # reset params to original values
                 layer_grad[param_index] = grad / 2 * epsilon
 
