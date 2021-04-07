@@ -4,6 +4,8 @@ from layers import legacy_conv4_layer, legacy_conv_layer, legacy_pool_layer
 from qiskit import QuantumCircuit
 from qiskit import quantum_info as qi
 import itertools
+import multiprocessing as mp
+import myQiskit as mQ
 
 class QcnnStruct:
 
@@ -128,6 +130,8 @@ class Qcnn(QcnnStruct):
         for index, wf in enumerate(input_wfs):
             state = self.embedding(wf)
             state = state.evolve(circ)
+            # state = mQ.my_evolve(circ, self.num_qubits, self.embedding(wf))
+
 
             predictions[index] = self.middle_qubit_exp_value(state)
 
@@ -139,23 +143,50 @@ class Qcnn(QcnnStruct):
 
         for layer_index, layer_params in enumerate(self.params):
             layer_grad = np.zeros(len(layer_params))
-            for param_index, param in enumerate(layer_params):
-                self.params[layer_index][param_index] += epsilon   # shift param by epsilon
-                plus_epsilon_pred = self.forward(input_wfs)
-                plus_epsilon_loss = self.mse_loss(plus_epsilon_pred, labels)
-                self.params = original_params.copy()  # reset params to original values
 
-                self.params[layer_index][param_index] -= epsilon   # shift param by epsilon
-                minus_epsilon_pred = self.forward(input_wfs)
-                minus_epsilon_loss = self.mse_loss(minus_epsilon_pred, labels)
-                self.params = original_params.copy()  # reset params to original values
-
-                grad = (plus_epsilon_loss - minus_epsilon_loss) / 2*epsilon
-                layer_grad[param_index] = grad
+            for param_index, _ in enumerate(layer_params):
+                grad = 0
+                for i in [1, -1]:
+                    self.params[layer_index][param_index] += i * epsilon  # shift params
+                    grad += i * self.mse_loss(self.forward(input_wfs), labels)
+                    self.params = original_params.copy()  # reset params to original values
+                layer_grad[param_index] = grad / 2 * epsilon
 
             gradient_mat.append(layer_grad)
 
         return gradient_mat
+
+    def pool_func_for_mp(self, inputs):
+        # Extract and separate list of parameters
+        pool_vals, input_wfs, labels, epsilon = inputs
+        i, j = pool_vals
+        grad = 0
+
+        for i in [1, -1]:
+            params = self.params.copy()
+            params[i][j] += i * epsilon  # shift params
+            grad += i * self.mse_loss(self.forward(input_wfs, params), labels)
+
+        pool_vals[2] = grad / 2 * epsilon
+        return pool_vals
+
+    # def compute_grad_w_mp(self, input_wfs, labels, epsilon=0.0001):
+    #     original_params = self.params.copy()
+    #
+    #     # Have you ever heard of code obfuscation?
+    #     # pool_vals = [(i[0], elem, val) for i in [(j, y) for j, y in enumerate(self.params)]
+    #     #              for elem, val in enumerate(i[1])]
+    #     pool_vals = [(i, j) for i, val in enumerate(self.params) for j, _ in enumerate(val)]
+    #     # have i, j so just pass into pool func and update self.params values? Is it possible?
+    #     inputs = (pool_vals, input_wfs, labels, epsilon)
+    #
+    #     p = mp.Pool(mp.cpu_count())
+    #     MS = p.map(self.pool_func_for_mp, inputs)
+    #
+    #     for val in MS:
+    #
+    #
+    #     return gradient_mat
 
     def update_params(self, gradient_mat, learning_rate):
         for param_layer, grad_layer in zip(self.params, gradient_mat):
@@ -175,14 +206,13 @@ class Qcnn(QcnnStruct):
         return loss / num_entries
 
     def middle_qubit_exp_value(self, state_vect):
-        final_active_qubits = self.get_final_state_active_qubits()   ### SLOW
-        num_qbits = len(final_active_qubits)
-        middle_qbit = final_active_qubits[num_qbits // 2]  # this is the index of the middle qubit
+        final_active_qubits = self.get_final_state_active_qubits()  ### SLOW
+        middle_qbit = final_active_qubits[len(final_active_qubits) // 2]  # this is the index of the middle qubit
 
         # the actual vector of a1, a2, ... , a2^n in np.array form
         probability_vector = (np.abs(np.array(state_vect.data))) ** 2
 
-        all_binary_combs = list(map(list, itertools.product([0, 1], repeat=num_qbits)))
+        all_binary_combs = list(map(list, itertools.product([0, 1], repeat=self.num_qubits)))
         newLst = np.array([elem for elem, val in enumerate(all_binary_combs) if val[middle_qbit] == 1])
         sums = np.sum(probability_vector[newLst])
 
