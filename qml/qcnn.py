@@ -1,4 +1,5 @@
 # qcnn
+import copy
 import numpy as np
 from layers import legacy_conv4_layer, legacy_conv_layer, legacy_pool_layer
 from qiskit import QuantumCircuit
@@ -138,7 +139,7 @@ class Qcnn(QcnnStruct):
         return predictions
 
     def compute_grad(self, input_wfs, labels, epsilon=0.0001):
-        original_params = self.params.copy()
+        original_params = copy.deepcopy(self.params)
         gradient_mat = []
 
         for layer_index, layer_params in enumerate(self.params):
@@ -156,37 +157,32 @@ class Qcnn(QcnnStruct):
 
         return gradient_mat
 
-    def pool_func_for_mp(self, inputs):
-        # Extract and separate list of parameters
-        pool_vals, input_wfs, labels, epsilon = inputs
-        i, j = pool_vals
+    def pool_func_for_mp(self, indexes, input_wfs, labels, epsilon):
+        i, j = indexes
         grad = 0
 
         for i in [1, -1]:
-            params = self.params.copy()
+            params = copy.deepcopy(self.params)
             params[i][j] += i * epsilon  # shift params
             grad += i * self.mse_loss(self.forward(input_wfs, params), labels)
 
-        pool_vals[2] = grad / 2 * epsilon
-        return pool_vals
+        layer_grad = grad / 2 * epsilon
+        return i, j, layer_grad
 
-    # def compute_grad_w_mp(self, input_wfs, labels, epsilon=0.0001):
-    #     original_params = self.params.copy()
-    #
-    #     # Have you ever heard of code obfuscation?
-    #     # pool_vals = [(i[0], elem, val) for i in [(j, y) for j, y in enumerate(self.params)]
-    #     #              for elem, val in enumerate(i[1])]
-    #     pool_vals = [(i, j) for i, val in enumerate(self.params) for j, _ in enumerate(val)]
-    #     # have i, j so just pass into pool func and update self.params values? Is it possible?
-    #     inputs = (pool_vals, input_wfs, labels, epsilon)
-    #
-    #     p = mp.Pool(mp.cpu_count())
-    #     MS = p.map(self.pool_func_for_mp, inputs)
-    #
-    #     for val in MS:
-    #
-    #
-    #     return gradient_mat
+    def compute_grad_w_mp(self, input_wfs, labels, epsilon=0.0001):
+        indexes = [(i, j) for i, val in enumerate(self.params) for j, _ in enumerate(val)]
+
+        p = mp.Pool(mp.cpu_count())
+        MS = p.starmap(self.pool_func_for_mp, zip(indexes,
+                                                  itertools.repeat(input_wfs),
+                                                  itertools.repeat(labels),
+                                                  itertools.repeat(epsilon)))
+
+        gradient_mat = copy.deepcopy(self.params)
+        for i, j, val in MS:
+            gradient_mat[i][j] = val
+
+        return gradient_mat
 
     def update_params(self, gradient_mat, learning_rate):
         for param_layer, grad_layer in zip(self.params, gradient_mat):
