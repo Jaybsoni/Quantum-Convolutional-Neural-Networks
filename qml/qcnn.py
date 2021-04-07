@@ -1,18 +1,23 @@
 # qcnn
 import copy
 import numpy as np
-from layers import legacy_conv4_layer, legacy_conv_layer, legacy_pool_layer
+from layers import legacy_conv4_layer, legacy_conv_layer, legacy_pool_layer, get_legacy_fc_layer
 from qiskit import QuantumCircuit
 from qiskit import quantum_info as qi
 import itertools
 import multiprocessing as mp
 import myQiskit as mQ
 
+legacy_fc_layer_n8 = get_legacy_fc_layer(8//3)
+legacy_fc_layer_n8.name += "_n8"
+
+
 class QcnnStruct:
 
     Layers = {legacy_conv4_layer.name: legacy_conv4_layer,
               legacy_conv_layer.name: legacy_conv_layer,
-              legacy_pool_layer.name: legacy_pool_layer}
+              legacy_pool_layer.name: legacy_pool_layer,
+              legacy_fc_layer_n8.name: legacy_fc_layer_n8}
 
     def __init__(self, num_qubits):
         self.num_qubits = num_qubits
@@ -132,7 +137,6 @@ class Qcnn(QcnnStruct):
             state = self.embedding(wf)
             state = state.evolve(circ)
             # state = mQ.my_evolve(circ, self.num_qubits, self.embedding(wf))
-
 
             predictions[index] = self.middle_qubit_exp_value(state)
 
