@@ -1,12 +1,12 @@
 import os
 import sys
 import time
-import random
 import psutil
 import itertools
 import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
+
 from functools import lru_cache, wraps
 
 
@@ -101,8 +101,9 @@ class HamiltonianOld:
 
     def get_first_term(self):
         self.first_term = np.zeros(shape=(self.size, self.size), dtype=float)
+
         for i in range(self.n - 2):
-            print("first term", i)
+            # print("first term", i)
             elem = i + 1  # math element is indexes at 1
 
             a_diag = np.diag(np.array(find_kron_faster(Z, elem, self.n)))
@@ -132,14 +133,18 @@ class HamiltonianOld:
         return A
 
     def get_second_term(self):
+        self.second_term = np.zeros(shape=(self.size, self.size), dtype=float)
+
         for i in range(self.n):
-            print(f"second term {i}/{self.n}")
+            # print(f"second term {i}/{self.n}")
             self.second_term -= find_kron_faster(X, i+1, self.n)
 
 
     def get_third_term(self):
+        self.third_term = np.zeros(shape=(self.size, self.size), dtype=float)
+
         for i in range(self.n - 1):  # This is actually 1 to N-2, python indexing has self.n-1
-            print(f"third term {i}/{self.n-1}")
+            # print(f"third term {i}/{self.n-1}")
             elem = i + 1  # math element is indexes at 1
 
             A = self.create_matrix_of_X(elem)
@@ -157,33 +162,33 @@ class HamiltonianOld:
         print("{:0.2f}% \tElapsed: {} \tRemaining: {}".format(percentage, self.convert_sec(time.time() - t0), self.convert_sec(time_remaning)))
 
     def generate_train_data(self, h1_range, h2_range):
-        filename = self.filename + "_train.txt"
+        filename = self.filename + "_trainOLD1.txt"
         if os.path.isfile(filename): os.remove(filename)
-        np.set_printoptions(threshold=np.inf)
 
         s = time.time()
-        # a = self.get_first_term_slow()
         self.get_first_term()
-        # print(np.array_equal(a, self.first_term))
         self.get_second_term()
-        self.get_first_term()
+        self.get_third_term()
         print(time.time() - s)
-        # raise Exception
+
         s = time.time()
         i = 1
+        vects = []
         for h1 in np.linspace(self.h1_min, self.h1_max, h1_range):
             for h2 in np.linspace(self.h2_min, self.h2_max, h2_range):
-
                 H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
+                H = np.array(H)
+
                 eigenvalues, eigenvectors = self.find_eigval(H)
                 self.test_dataset(H, eigenvalues)
+                vects.append([eigenvalues, eigenvectors, H])
 
                 # Write to file each time to avoid saving to ram
                 self.write_to_file(filename, h1, h2, eigenvectors)
-                i += 1
-                if i % 1 == 0:
-                    self.calculate_time_remaining(h1_range * h2_range, s, i)
-
+                # i += 1
+                # if i % 1 == 0:
+                #     self.calculate_time_remaining(h1_range * h2_range, s, i)
+        return vects
 
     def generate_test_data(self, h1_range):
         filename = self.filename + "_test.txt"
@@ -210,14 +215,13 @@ class HamiltonianOld:
 
     @staticmethod
     def find_eigval(H):
-        b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-16)
+        b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-4)
         return b, c.flatten()
 
     def test_dataset(self, H, possible_eigenvalues):
         ww, vv = np.linalg.eig(H)  # Old method with linalg
         index = np.where(ww == np.amin(ww))
         npEigVal, npEigVec = ww[index], vv[:, index]
-
 
         """
         np.linalg.eig returns the eigenvalues and vectors of a matrix
@@ -233,29 +237,26 @@ class HamiltonianOld:
                 tempVec.append(npEigVec[eigVec][0][eigVal])
             eigValsList.append(np.array(tempVec))
 
-
         # # sum_vec is the sum of all vectors returned by np.linalg.eig (the slow, 'right' one)
         b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-16)
 
         # Test they're the same
         sum_vec = np.sum(eigValsList, axis=0)
         slowVectMag = sum_vec / np.linalg.norm(sum_vec)
-        assert np.allclose((H @ slowVectMag) / possible_eigenvalues, np.array(slowVectMag, dtype=complex), 1e-9)
+
+        aa = (H @ slowVectMag) / possible_eigenvalues
+        assert np.allclose(aa, np.array(slowVectMag, dtype=complex), 1e-9)
 
         # Tests the inverse way too? TODO: JAAYYYYY
         fastVectMag = c.flatten() / np.linalg.norm(c.flatten())
         assert np.allclose((H @ fastVectMag) / npEigVal[0], np.array(fastVectMag, dtype=complex), 1e-9)
 
 
-
-
+X = np.array([[0, 1], [1, 0]], dtype=int)
+Z = np.array([[1, 0], [0, -1]], dtype=int)
+II = sparse.dia_matrix((np.ones(2), np.array([0])), dtype=int, shape=(2, 2))
 
 if __name__ == '__main__':
-    X = np.array([[0, 1], [1, 0]], dtype=int)
-    Z = np.array([[1, 0], [0, -1]], dtype=int)
-    II = sparse.dia_matrix((np.ones(2), np.array([0])), dtype=int, shape=(2, 2))
-
-
     s = time.time()
     h1 = (0, 1.6)
     h2 = (-1.6, 1.6)

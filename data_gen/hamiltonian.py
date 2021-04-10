@@ -103,7 +103,7 @@ class Hamiltonian:
     def get_first_term_faster(self):
         self.first_term = np.zeros(shape=(self.size, self.size), dtype=float)
         for i in range(self.n - 2):
-            print(f"first term {i}/{self.n - 2}")
+            # print(f"first term {i}/{self.n - 2}")
             elem = i + 1  # math element is indexes at 1
 
             AA = find_kron_no_np(Z, elem, self.n)
@@ -121,7 +121,7 @@ class Hamiltonian:
     def get_second_term(self):
         self.second_term = np.zeros(shape=(self.size, self.size), dtype=float)
         for i in range(self.n):
-            print(f"second term {i}/{self.n}")
+            # print(f"second term {i}/{self.n}")
             self.second_term -= find_kron_no_np(X, i+1, self.n).toarray()
 
     def get_third_term_faster(self):
@@ -131,7 +131,8 @@ class Hamiltonian:
         :return:
         """
         for i in range(self.n - 1):  # This is actually 1 to N-2, python indexing has self.n-1
-            print(f"third term {i}/{self.n-1}")
+            # print(f"third term {i}/{self.n-1}")
+            
             elem = i + 1  # math element is indexes at 1
 
             B1 = find_kron_no_np(X, elem, self.n)
@@ -179,7 +180,7 @@ class Hamiltonian:
         percentage = (i / n) * 100
         print("{:0.2f}% \tElapsed: {} \tRemaining: {}".format(percentage, self.convert_sec(time.time() - t0), self.convert_sec(time_remaning)))
 
-    def generate_train_data(self, h1_range, h2_range):
+    def generate_data(self, h1_range, h2_range):
         s = time.time()
         self.get_first_term_faster()
         self.get_second_term()
@@ -191,69 +192,69 @@ class Hamiltonian:
 
         s = time.time()
         i = 1
-        for h1, h2 in h1h2:
-            # if h2_range == 1:
-            #     h2 = 0  # TODO Jay: Do I not need this?
-            # print(h2)
+        vects = []
+        # for h1, h2 in h1h2:
+        for h1 in np.linspace(self.h1_min, self.h1_max, h1_range):
+            for h2 in np.linspace(self.h2_min, self.h2_max, h2_range):
+                if h2_range == 1:
+                    h2 = 0  # TODO Jay: Do I not need this?
 
-            H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
-            eigenvalues, eigenvectors = self.find_eigval(H)
-            # self.test_dataset(H, eigenvalues)  # SLOW!
+                H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
+                eigenvalues, eigenvectors = self.find_eigval(H)
+                if h1 == 0.0 and h2 == -1.6:
+                    self.test_dataset(H, eigenvalues)  # SLOW!
+                vects.append([eigenvalues, eigenvectors, H])
 
-            # Write to file each time to avoid saving to ram
-            with open(self.filename, 'a+') as f:
-                f.write(f"{h1, h2}_")  # Append h1, h2 for reference
-                for line in eigenvectors: f.write(str(line) + " ")
-                f.write("\n")
+                # Write to file each time to avoid saving to ram
+                with open(self.filename, 'a+') as f:
+                    f.write(f"{h1, h2}_")  # Append h1, h2 for reference
+                    for line in eigenvectors: f.write(str(line) + " ")
+                    f.write("\n")
 
-            i += 1
-            if i % 10 == 0:
-                self.calculate_time_remaining(h1_range * h2_range, s, i)
+            # i += 1
+            # if i % 10 == 0:
+            #     self.calculate_time_remaining(h1_range * h2_range, s, i)
 
-
-
-    def pool_func_for_mp(self, h1h2):
-        h1, h2 = h1h2
-        # print(h1, h2)
-        H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
-        eigenvalues, eigenvectors = self.find_eigval(H)
-        # self.test_dataset(H, eigenvalues)  # SLOW!
-        return h1, h2, eigenvectors
-
-
-    def generate_train_data_with_mp(self, h1_range, h2_range):
-        s = time.time()
-        self.get_first_term_faster()
-        self.get_second_term()
-        self.get_first_term_faster()
-        print(time.time() - s)
-
-        h1h2 = [[h1, h2] for h1 in np.linspace(self.h1_min, self.h1_max, h1_range)
-                for h2 in np.linspace(self.h2_min, self.h2_max, h2_range)]
-
-        p = mp.Pool(mp.cpu_count())
-        MS = list(tqdm.tqdm(p.imap(self.pool_func_for_mp, h1h2), total=len(h1h2)))
-        # MS = p.map(self.pool_func_for_mp, h1h2)
-        print(sys.getsizeof(MS))
-        for h1, h2, eigenvector in MS:
-            # Write to file each time to avoid saving to ram
-            with open(self.filename, 'a+') as f:
-                f.write(f"{h1, h2}_")  # Append h1, h2 for reference
-                for line in eigenvector: f.write(str(line) + " ")
-                f.write("\n")
-        # gradient_mat = copy.deepcopy(self.params)
-
+        return vects
+    # def pool_func_for_mp(self, h1h2):
+    #     h1, h2 = h1h2
+    #     # print(h1, h2)
+    #     H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
+    #     eigenvalues, eigenvectors = self.find_eigval(H)
+    #     # self.test_dataset(H, eigenvalues)  # SLOW!
+    #     return h1, h2, eigenvectors
+    # def generate_train_data_with_mp(self, h1_range, h2_range):
+    #     s = time.time()
+    #     self.get_first_term_faster()
+    #     self.get_second_term()
+    #     self.get_first_term_faster()
+    #     print(time.time() - s)
+    #
+    #     h1h2 = [[h1, h2] for h1 in np.linspace(self.h1_min, self.h1_max, h1_range)
+    #             for h2 in np.linspace(self.h2_min, self.h2_max, h2_range)]
+    #
+    #     p = mp.Pool(mp.cpu_count())
+    #     MS = list(tqdm.tqdm(p.imap(self.pool_func_for_mp, h1h2), total=len(h1h2)))
+    #     # MS = p.map(self.pool_func_for_mp, h1h2)
+    #     print(sys.getsizeof(MS))
+    #     for h1, h2, eigenvector in MS:
+    #         # Write to file each time to avoid saving to ram
+    #         with open(self.filename, 'a+') as f:
+    #             f.write(f"{h1, h2}_")  # Append h1, h2 for reference
+    #             for line in eigenvector: f.write(str(line) + " ")
+    #             f.write("\n")
+    #     # gradient_mat = copy.deepcopy(self.params)
 
     @staticmethod
     def find_eigval(H):
-        b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-16)
+        b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-4)
         return b, c.flatten()
 
     def test_dataset(self, H, possible_eigenvalues):
+
         ww, vv = np.linalg.eig(H)  # Old method with linalg
         index = np.where(ww == np.amin(ww))
         npEigVal, npEigVec = ww[index], vv[:, index]
-
 
         """
         np.linalg.eig returns the eigenvalues and vectors of a matrix
@@ -275,8 +276,10 @@ class Hamiltonian:
 
         # Test they're the same
         sum_vec = np.sum(eigValsList, axis=0)
+
         slowVectMag = sum_vec / np.linalg.norm(sum_vec)
-        assert np.allclose((H @ slowVectMag) / possible_eigenvalues, np.array(slowVectMag, dtype=complex), 1e-9)
+        aa = (H @ slowVectMag) / possible_eigenvalues
+        assert np.allclose(aa, np.array(slowVectMag, dtype=complex), 1e-9)
 
         # Tests the inverse way too? TODO: JAAYYYYY
         fastVectMag = c.flatten() / np.linalg.norm(c.flatten())
@@ -292,12 +295,42 @@ II = sparse.dia_matrix((np.ones(2), np.array([0])), dtype=int, shape=(2, 2))
 if __name__ == '__main__':
     s = time.time()
 
-    filename = "train"
+    filename = "test"
+
     h1 = (0, 1.6)
     h2 = (-1.6, 1.6)
-    H = Hamiltonian(11, filename, h1, h2)
-    H.generate_train_data(64, 64)
+    H = Hamiltonian(8, filename, h1, h2)
+    H.generate_data(64, 32)
+
+    filename = "train"
+    H = Hamiltonian(8, filename, h1, h2)
+    H.generate_data(40, 1)
     # print(find_kron_no_np.cache_info())
 
     print(f"Time for creating dataset was {time.time() - s} seconds")
 
+    #
+    # h1h2_old, old = read_eigenvectors('example_test_data_n8.txt')
+    # h1h2_new, new = read_eigenvectors('dataset_n=8_test.txt')
+    #
+    # print(np.array_equal(np.array(h1h2_old), np.array(h1h2_new)))
+    #
+    # print(old.shape)
+    # print(new.shape)
+    # print(np.allclose(old, new, 1))
+    # print(np.allclose(old, new, atol=1))
+    # i = 0
+    # for a, b in zip(old, new):
+    #     if not np.allclose(old, new, 1e2):
+    #         i += 1
+    #         print("-")
+    #         print(np.allclose(old, new, 1e2))
+    #         print(a, b)
+    # print(i)
+
+    # flipped_pred_mat = new.reshape((64, 64), order='F')
+    # pred_mat = []
+    # for row_index in np.arange(len(flipped_pred_mat) - 1, -1, -1):
+    #     pred_mat.append(flipped_pred_mat[row_index])
+    #
+    # pred_mat = np.array(pred_mat)
