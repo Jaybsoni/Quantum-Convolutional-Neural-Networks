@@ -1,10 +1,14 @@
 import os
 import sys
 import time
+import tqdm
 import psutil
+import itertools
 import numpy as np
+import multiprocessing as mp
 import scipy.sparse as sparse
 import scipy.sparse.linalg
+
 from functools import lru_cache, wraps
 
 
@@ -49,9 +53,8 @@ def read_eigenvectors(file):
         return h_vals, np.loadtxt(textData, dtype=complex)
 
 
-# @np_cache(maxsize=1024)
-def find_kron_faster(array, index, n):
-    before_w = psutil.virtual_memory().used / 1024 ** 2
+def find_kron_no_np(array, index, n):
+    # before_w = psutil.virtual_memory().used / 1024 ** 2
     if np.array_equal(array, X):
         array = sparse.dia_matrix((np.array([np.ones(1)]), np.array([-1])), dtype=int, shape=(2, 2))
         array.setdiag(np.ones(1), 1)
@@ -66,7 +69,6 @@ def find_kron_faster(array, index, n):
     order[index-1] = 0
 
     for i in range(1, len(order)):
-
         # Sets next element to Identity if next element is a 1, if zero, then array
         current = array if order[i] == 0 else II
 
@@ -79,23 +81,11 @@ def find_kron_faster(array, index, n):
         else:  # Computes kron of last element current matrix with next element
             t = sparse.kron(t, current)
 
-        # print(sys.getsizeof(t), sys.getsizeof(t.toarray()) / 1024 ** 2 )
-        # print(f'{i} create_matrix_of_X after:', (psutil.virtual_memory().used / 1024 ** 2) - before_w, 'MB')
-
-    # print(sys.getsizeof(t))
-    # print(sys.getsizeof(t) / 1024 ** 2)
-    # print(sys.getsizeof(t.toarray()) / 1024 ** 2)
-
-    # print('create_matrix_of_X after:', (psutil.virtual_memory().used / 1024 ** 2) - before_w, 'MB')
-    # print("--")
-    # print(sys.getsizeof(t))
-
-    return t.toarray().copy()
-
+    return t.copy()
 
 
 class Hamiltonian:
-    def __init__(self, n=2, h1_metadata=(0, 1.6), h2_metadata=(-1.6, 1.6)):
+    def __init__(self, n=2, filename="", h1_metadata=(0, 1.6), h2_metadata=(-1.6, 1.6)):
         self.n = n
         self.h1_min, self.h1_max = h1_metadata
         self.h2_min, self.h2_max = h2_metadata
@@ -107,52 +97,77 @@ class Hamiltonian:
         self.third_term = np.zeros(shape=(self.size, self.size), dtype=float)
 
         # Delete the output file if exists so we can append to a fresh ones.
-        self.filename = f'dataset_n={n}'
+        self.filename = f'dataset_n={n}_' + filename + ".txt"
+        if os.path.isfile(self.filename): os.remove(self.filename)
 
-
-    def get_first_term_fast(self):
+    def get_first_term_faster(self):
+        self.first_term = np.zeros(shape=(self.size, self.size), dtype=float)
         for i in range(self.n - 2):
-            # before_w = psutil.virtual_memory().used / 1024 ** 2  # MB
+            print(f"first term {i}/{self.n - 2}")
             elem = i + 1  # math element is indexes at 1
 
-            a_diag = np.diag(np.array(find_kron_faster(Z, elem, self.n)))
-            A = sparse.dia_matrix((a_diag, np.array([0])), shape=(self.size, self.size))
-            B = self.create_matrix_of_X(elem + 1)
+            AA = find_kron_no_np(Z, elem, self.n)
+            BB = find_kron_no_np(X, elem + 1, self.n)
+            CC = find_kron_no_np(Z, elem + 2, self.n)
 
-            c_diag = np.diag(np.array(find_kron_faster(Z, elem + 2, self.n)))
-            C = sparse.dia_matrix((c_diag, np.array([0])), shape=(self.size, self.size))
-            self.first_term -= ((A.dot(B)).dot(C)).toarray()
+            # Instead of A.dot(B).dot(C), note that A and C are diagonal with 1's and -1's.
+            # Convert A, C into vectors and just multiply them to B, a 45 000% speedup over dot product for n=14
+            a_diag = AA.diagonal()[..., None]
+            c_diag = CC.diagonal()[..., None]
+            ss_fast = BB.multiply(a_diag).multiply(c_diag)
 
-            del A, B, C, a_diag, c_diag
-            # print('get_first_term_fast after:', (psutil.virtual_memory().used / 1024 ** 2) - before_w, 'MB')
-
-    def create_matrix_of_X(self, elem):
-        before_w = psutil.virtual_memory().used / 1024 ** 2  # MB
-
-        full_array = np.array(find_kron_faster(X, elem, self.n))
-        diag_index = np.where(full_array[0] == 1)[0][0]
-        data = np.array([np.diag(full_array, -diag_index)])
-        A = sparse.dia_matrix((data, np.array([-diag_index])), shape=(self.size, self.size))
-
-        # Set second diagonal separately due to stupid indexing of sparse.dia_matrix
-        A.setdiag(np.diag(full_array, diag_index), diag_index)
-
-        del full_array, diag_index, data  # Delete arrays since it's huge
-        return A
+            self.first_term -= ss_fast.toarray()
 
     def get_second_term(self):
         self.second_term = np.zeros(shape=(self.size, self.size), dtype=float)
         for i in range(self.n):
-            self.second_term -= find_kron_faster(X, i+1, self.n)
+            print(f"second term {i}/{self.n}")
+            self.second_term -= find_kron_no_np(X, i+1, self.n).toarray()
 
-
-    def get_third_term_fast(self):
+    def get_third_term_faster(self):
+        self.third_term = np.zeros(shape=(self.size, self.size), dtype=float)
+        """
+        Honestly? This method is magic. It. Just. Works. Don't believe me? Try to make it faster....
+        :return:
+        """
         for i in range(self.n - 1):  # This is actually 1 to N-2, python indexing has self.n-1
+            print(f"third term {i}/{self.n-1}")
             elem = i + 1  # math element is indexes at 1
 
-            A = self.create_matrix_of_X(elem)
-            B = self.create_matrix_of_X(elem + 1)
-            self.third_term -= (A.dot(B)).toarray()
+            B1 = find_kron_no_np(X, elem, self.n)
+            B2 = find_kron_no_np(X, elem + 1, self.n)
+
+            B1_rows, B1_cols = sparse.coo_matrix(B1, dtype=sparse.coo_matrix).nonzero()
+            B2_rows = B1_cols
+            B2_cols0 = []
+
+            def extract_elem(elem):
+                B2_cols0.append(elem)
+            list(map(B2.getrow, filter(extract_elem, B2_rows)))
+
+            # Good = []  # Temp!
+            # for val in B2_rows:
+            #     B2_col = str(B2.getrow(val)).split(")")[0].split(" ")[-1]
+            #     # print(val, B2_cols[elem], B2_col)
+            #     Good.append(int(B2_col))
+
+            flat_list = []
+            swaps = int(pow(2, self.n - 1 - elem))  # How many groups the list should be seperated into
+            groups = [B2_cols0[i:i + swaps] for i in range(0, len(B2_cols0), swaps)]  # respective sections
+            for i in range(int(len(groups) / 2)):  # Preform the swaps
+                switch = groups[2 * i:(2 * i) + 2]
+                flat_list.append([*switch[1], *switch[0]])
+            # a = [[*groups[2 * i:(2 * i) + 2][1], *groups[2 * i:(2 * i) + 2][0]] for i in range(int(len(groups) / 2))]
+            flat_list = list(itertools.chain(*flat_list))
+
+            size = len(B1_rows)
+            coo = sparse.coo_matrix((np.ones(size, dtype=int), (B1_rows, flat_list)), shape=(size, size))
+
+            # Old method to compare to to confirm dot product is done correctly
+            # ss_slow = (B1.dot(B2)).toarray()
+            # print(f"dot vs new are equal?", np.array_equal(ss_slow, coo.toarray()))
+            # assert np.array_equal(ss_slow, coo.toarray())
+            self.third_term -= coo.toarray()
 
     def convert_sec(self, t):
         min = np.floor(t/60)
@@ -165,52 +180,69 @@ class Hamiltonian:
         print("{:0.2f}% \tElapsed: {} \tRemaining: {}".format(percentage, self.convert_sec(time.time() - t0), self.convert_sec(time_remaning)))
 
     def generate_train_data(self, h1_range, h2_range):
-        filename = self.filename + "_train.txt"
-        if os.path.isfile(filename): os.remove(filename)
-
         s = time.time()
-        self.get_first_term_fast()
+        self.get_first_term_faster()
         self.get_second_term()
-        self.get_third_term_fast()
+        self.get_first_term_faster()
         print(time.time() - s)
+
+        h1h2 = [[h1, h2] for h1 in np.linspace(self.h1_min, self.h1_max, h1_range)
+                for h2 in np.linspace(self.h2_min, self.h2_max, h2_range)]
 
         s = time.time()
         i = 1
-        for h1 in np.linspace(self.h1_min, self.h1_max, h1_range):
-            for h2 in np.linspace(self.h2_min, self.h2_max, h2_range):
+        for h1, h2 in h1h2:
+            # if h2_range == 1:
+            #     h2 = 0  # TODO Jay: Do I not need this?
+            # print(h2)
 
-                H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
-                eigenvalues, eigenvectors = self.find_eigval(H)
-                self.test_dataset(H, eigenvalues)
-
-                # Write to file each time to avoid saving to ram
-                self.write_to_file(filename, h1, h2, eigenvectors)
-                i += 1
-                if i % 10 == 0:
-                    self.calculate_time_remaining(h1_range * h2_range, s, i)
-
-
-    def generate_test_data(self, h1_range):
-        filename = self.filename + "_test.txt"
-        if os.path.isfile(filename): os.remove(filename)
-
-        self.get_first_term_fast()
-        self.get_second_term()
-        self.get_third_term_fast()
-
-        for h1 in np.linspace(self.h1_min, self.h1_max, h1_range):
-            H = self.first_term + (self.second_term * h1)  # h2 = 0, third term removed
+            H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
             eigenvalues, eigenvectors = self.find_eigval(H)
+            # self.test_dataset(H, eigenvalues)  # SLOW!
 
             # Write to file each time to avoid saving to ram
-            self.write_to_file(filename, h1, 0, eigenvectors)
+            with open(self.filename, 'a+') as f:
+                f.write(f"{h1, h2}_")  # Append h1, h2 for reference
+                for line in eigenvectors: f.write(str(line) + " ")
+                f.write("\n")
+
+            i += 1
+            if i % 10 == 0:
+                self.calculate_time_remaining(h1_range * h2_range, s, i)
 
 
-    def write_to_file(self, filename, h1, h2, eigenvectors):
-        with open(filename, 'a+') as f:
-            f.write(f"{h1, h2}_")  # Append h1, h2 for reference
-            for line in eigenvectors: f.write(str(line) + " ")
-            f.write("\n")
+
+    def pool_func_for_mp(self, h1h2):
+        h1, h2 = h1h2
+        # print(h1, h2)
+        H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
+        eigenvalues, eigenvectors = self.find_eigval(H)
+        # self.test_dataset(H, eigenvalues)  # SLOW!
+        return h1, h2, eigenvectors
+
+
+    def generate_train_data_with_mp(self, h1_range, h2_range):
+        s = time.time()
+        self.get_first_term_faster()
+        self.get_second_term()
+        self.get_first_term_faster()
+        print(time.time() - s)
+
+        h1h2 = [[h1, h2] for h1 in np.linspace(self.h1_min, self.h1_max, h1_range)
+                for h2 in np.linspace(self.h2_min, self.h2_max, h2_range)]
+
+        p = mp.Pool(mp.cpu_count())
+        MS = list(tqdm.tqdm(p.imap(self.pool_func_for_mp, h1h2), total=len(h1h2)))
+        # MS = p.map(self.pool_func_for_mp, h1h2)
+        print(sys.getsizeof(MS))
+        for h1, h2, eigenvector in MS:
+            # Write to file each time to avoid saving to ram
+            with open(self.filename, 'a+') as f:
+                f.write(f"{h1, h2}_")  # Append h1, h2 for reference
+                for line in eigenvector: f.write(str(line) + " ")
+                f.write("\n")
+        # gradient_mat = copy.deepcopy(self.params)
+
 
     @staticmethod
     def find_eigval(H):
@@ -246,45 +278,26 @@ class Hamiltonian:
         slowVectMag = sum_vec / np.linalg.norm(sum_vec)
         assert np.allclose((H @ slowVectMag) / possible_eigenvalues, np.array(slowVectMag, dtype=complex), 1e-9)
 
-        # Tests The inverse way too? TODO: JAAYYYYY
+        # Tests the inverse way too? TODO: JAAYYYYY
         fastVectMag = c.flatten() / np.linalg.norm(c.flatten())
         assert np.allclose((H @ fastVectMag) / npEigVal[0], np.array(fastVectMag, dtype=complex), 1e-9)
 
 
 
 
+X = np.array([[0, 1], [1, 0]], dtype=int)
+Z = np.array([[1, 0], [0, -1]], dtype=int)
+II = sparse.dia_matrix((np.ones(2), np.array([0])), dtype=int, shape=(2, 2))
 
 if __name__ == '__main__':
-    X = np.array([[0, 1], [1, 0]], dtype=int)
-    Z = np.array([[1, 0], [0, -1]], dtype=int)
-    II = sparse.dia_matrix((np.ones(2), np.array([0])), dtype=int, shape=(2, 2))
-
     s = time.time()
+
+    filename = "train"
     h1 = (0, 1.6)
     h2 = (-1.6, 1.6)
-    # H = Hamiltonian(4, h1, h2)
-    # H.generate_train_data(32, 64)
-    # H.generate_test_data(32)
-    # print(find_kron_faster.cache_info())
+    H = Hamiltonian(11, filename, h1, h2)
+    H.generate_train_data(64, 64)
+    # print(find_kron_no_np.cache_info())
+
     print(f"Time for creating dataset was {time.time() - s} seconds")
 
-    h1h2_old, old = read_eigenvectors('data/dataset_n=4_train_w_arrays.txt')
-    # h1h2_old, old = read_eigenvectors('data/dataset_n=4_train.txt')
-    h1h2_new, new = read_eigenvectors('dataset_n=4_train.txt')
-
-
-
-    print(np.array_equal(np.array(h1h2_old), np.array(h1h2_new)))
-
-    print(old.shape)
-    print(new.shape)
-    print(np.allclose(old, new, 1))
-    print(np.allclose(old, new, atol=1))
-    i = 0
-    # for a, b in zip(old, new):
-    #     if not np.allclose(old, new, 1e2):
-    #         i += 1
-    #         print("-")
-    #         print(np.allclose(old, new, 1e2))
-    #         print(a, b)
-    print(i)
