@@ -185,7 +185,7 @@ class Hamiltonian:
         s = time.time()
         self.get_first_term_faster()
         self.get_second_term()
-        self.get_first_term_faster()
+        self.get_third_term_faster()
         print(time.time() - s)
 
         h1h2 = [[h1, h2] for h1 in np.linspace(self.h1_min, self.h1_max, h1_range)
@@ -193,59 +193,58 @@ class Hamiltonian:
 
         s = time.time()
         i = 1
-        vects = []
+        # vects = []
         for h1, h2 in tqdm.tqdm(h1h2):
-                if h2_range == 1:
-                    h2 = 0  # TODO Jay: Do I not need this?
+            if h2_range == 1:
+                h2 = 0  # TODO Jay: Do I not need this?
 
-                H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
-                eigenvalues, eigenvectors = self.find_eigval(H)
-                # if h1 == 0.0 and h2 == -1.6:
-                # self.test_dataset(H, eigenvalues)  # SLOW!
-                vects.append([eigenvalues, eigenvectors, H])
+            H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
+            eigenvalue, eigenvector = self.find_eigval(H)
+            # eigenvalues, eigenvector = self.find_eigval_with_np(H)
+            # if h1 == 0.0 and h2 == -1.6:
+            # self.test_dataset(H, eigenvalues)  # SLOW!
+            # vects.append([eigenvalues, eigenvector, H])
 
-                # Write to file each time to avoid saving to ram
-                with open(self.filename, 'a+') as f:
-                    f.write(f"{h1, h2}_")  # Append h1, h2 for reference
-                    for line in eigenvectors: f.write(str(line) + " ")
-                    f.write("\n")
+            # if not np.isclose(np.linalg.norm(eigenvector), 1, atol=0.01):
+            #     print(h1, h2, np.linalg.norm(eigenvector))
+
+            # Write to file each time to avoid saving to ram
+            with open(self.filename, 'a+') as f:
+                f.write(f"{h1, h2}_")  # Append h1, h2 for reference
+                for line in eigenvector:
+                    f.write(str(line) + " ")
+                f.write("\n")
+
             # i += 1
             # if i % 10 == 0:
             #     self.calculate_time_remaining(h1_range * h2_range, s, i)
-        return vects
-    # def pool_func_for_mp(self, h1h2):
-    #     h1, h2 = h1h2
-    #     # print(h1, h2)
-    #     H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
-    #     eigenvalues, eigenvectors = self.find_eigval(H)
-    #     # self.test_dataset(H, eigenvalues)  # SLOW!
-    #     return h1, h2, eigenvectors
-    # def generate_train_data_with_mp(self, h1_range, h2_range):
-    #     s = time.time()
-    #     self.get_first_term_faster()
-    #     self.get_second_term()
-    #     self.get_first_term_faster()
-    #     print(time.time() - s)
-    #
-    #     h1h2 = [[h1, h2] for h1 in np.linspace(self.h1_min, self.h1_max, h1_range)
-    #             for h2 in np.linspace(self.h2_min, self.h2_max, h2_range)]
-    #
-    #     p = mp.Pool(mp.cpu_count())
-    #     MS = list(tqdm.tqdm(p.imap(self.pool_func_for_mp, h1h2), total=len(h1h2)))
-    #     # MS = p.map(self.pool_func_for_mp, h1h2)
-    #     print(sys.getsizeof(MS))
-    #     for h1, h2, eigenvector in MS:
-    #         # Write to file each time to avoid saving to ram
-    #         with open(self.filename, 'a+') as f:
-    #             f.write(f"{h1, h2}_")  # Append h1, h2 for reference
-    #             for line in eigenvector: f.write(str(line) + " ")
-    #             f.write("\n")
-    #     # gradient_mat = copy.deepcopy(self.params)
+        # return vects
 
     @staticmethod
     def find_eigval(H):
         b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-16)
         return b, c.flatten()
+
+    @staticmethod
+    def find_eigval_with_np(H):
+        ww, vv = np.linalg.eig(H)  # Old method with linalg
+        index = np.where(ww == np.amin(ww))
+        npEigVal, npEigVec = ww[index], vv[:, index]
+
+        eigVectList = []  # Converts np.eig to an output that's actually usable
+        for eigVal in range(len(npEigVal)):
+            tempVec = []
+
+            for eigVec in range(len(npEigVec)):
+                tempVec.append(npEigVec[eigVec][0][eigVal])
+            eigVectList.append(np.array(tempVec))
+
+        sum_vec = np.sum(eigVectList, axis=0)
+        slowVectVec = sum_vec / np.linalg.norm(sum_vec)
+        return npEigVal[0], slowVectVec
+
+        # b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-16)
+        # return b, c.flatten()
 
 
     def test_dataset(self, H, possible_eigenvalues):
@@ -269,10 +268,10 @@ class Hamiltonian:
 
         # Test they're the same
         sum_vec = np.sum(eigVectList, axis=0)
-        slowVectMag = sum_vec / np.linalg.norm(sum_vec)
+        slowVectVec = sum_vec / np.linalg.norm(sum_vec)
 
-        aa = (H @ slowVectMag) / possible_eigenvalues
-        assert np.allclose(aa, np.array(slowVectMag, dtype=complex), 1e-9)
+        aa = (H @ slowVectVec) / possible_eigenvalues
+        assert np.allclose(aa, np.array(slowVectVec, dtype=complex), 1e-9)
 
 
 X = np.array([[0, 1], [1, 0]], dtype=int)
