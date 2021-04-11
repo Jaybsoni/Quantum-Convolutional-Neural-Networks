@@ -215,7 +215,7 @@ class HamiltonianOld:
 
     @staticmethod
     def find_eigval(H):
-        b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-4)
+        b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-16)
         return b, c.flatten()
 
     def test_dataset(self, H, possible_eigenvalues):
@@ -237,20 +237,16 @@ class HamiltonianOld:
                 tempVec.append(npEigVec[eigVec][0][eigVal])
             eigValsList.append(np.array(tempVec))
 
-        # # sum_vec is the sum of all vectors returned by np.linalg.eig (the slow, 'right' one)
-        b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-16)
-
         # Test they're the same
         sum_vec = np.sum(eigValsList, axis=0)
         slowVectMag = sum_vec / np.linalg.norm(sum_vec)
 
         aa = (H @ slowVectMag) / possible_eigenvalues
-        assert np.allclose(aa, np.array(slowVectMag, dtype=complex), 1e-9)
+        is_same = np.allclose(aa, np.array(slowVectMag, dtype=complex), 1e-9)
 
-        # Tests the inverse way too? TODO: JAAYYYYY
-        fastVectMag = c.flatten() / np.linalg.norm(c.flatten())
-        assert np.allclose((H @ fastVectMag) / npEigVal[0], np.array(fastVectMag, dtype=complex), 1e-9)
-
+        if not is_same:
+            print(possible_eigenvalues, npEigVal)
+        assert is_same
 
 X = np.array([[0, 1], [1, 0]], dtype=int)
 Z = np.array([[1, 0], [0, -1]], dtype=int)
@@ -260,7 +256,7 @@ if __name__ == '__main__':
     s = time.time()
     h1 = (0, 1.6)
     h2 = (-1.6, 1.6)
-    H = HamiltonianOld(10, h1, h2)
+    H = HamiltonianOld(6, h1, h2)
     H.generate_train_data(64, 64)
     # H.generate_test_data(32)
     # print(find_kron_no_np.cache_info())
