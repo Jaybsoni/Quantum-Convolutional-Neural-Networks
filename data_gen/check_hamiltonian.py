@@ -36,7 +36,7 @@ res1 = H.find_kron_no_np(X, 3, 3).toarray()
 res2 = HO.find_kron_faster(X, 3, 3)
 print(np.array_equal(test, res1), np.array_equal(test, res2))
 
-n=7
+n=8
 h1 = (0, 1.6)
 h2 = (-1.6, 1.6)
 H_Ham = H.Hamiltonian(n, "_trainNEW1", h1, h2)
@@ -62,9 +62,17 @@ for a, b in zip(vects_new, vects_old):
     eigenvalues_new, eigenvectors_new, HH_new = a
     eigenvalues_old, eigenvectors_old, HH_old = b
     print("+")
+    # print(HH_new)
+    # print(HH_old)
     print(np.array_equal(np.array(HH_old), np.array(HH_new)))
-    print(np.array_equal(np.array(eigenvalues_old), np.array(eigenvalues_new)))
-    print(np.array_equal(np.array(eigenvectors_old), np.array(eigenvectors_new)))
+    vals_same = np.isclose(np.array(eigenvalues_old), np.array(eigenvalues_new), atol=1e-9)
+    print(vals_same)
+    if not vals_same:
+        print("---")
+        print(eigenvalues_old[0], eigenvalues_new[0])
+
+
+    # print(np.array_equal(np.array(eigenvectors_old), np.array(eigenvectors_new)))
 
 # h1h2_old, old = read_eigenvectors('data/dataset_n=4_train_w_arrays.txt')
 # h1h2_old, old = read_eigenvectors('data/dataset_n=4_train.txt')

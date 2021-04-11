@@ -132,7 +132,7 @@ class Hamiltonian:
         """
         for i in range(self.n - 1):  # This is actually 1 to N-2, python indexing has self.n-1
             # print(f"third term {i}/{self.n-1}")
-            
+
             elem = i + 1  # math element is indexes at 1
 
             B1 = find_kron_no_np(X, elem, self.n)
@@ -181,6 +181,7 @@ class Hamiltonian:
         print("{:0.2f}% \tElapsed: {} \tRemaining: {}".format(percentage, self.convert_sec(time.time() - t0), self.convert_sec(time_remaning)))
 
     def generate_data(self, h1_range, h2_range):
+        np.set_printoptions(threshold=np.inf)
         s = time.time()
         self.get_first_term_faster()
         self.get_second_term()
@@ -193,16 +194,14 @@ class Hamiltonian:
         s = time.time()
         i = 1
         vects = []
-        # for h1, h2 in h1h2:
-        for h1 in np.linspace(self.h1_min, self.h1_max, h1_range):
-            for h2 in np.linspace(self.h2_min, self.h2_max, h2_range):
+        for h1, h2 in tqdm.tqdm(h1h2):
                 if h2_range == 1:
                     h2 = 0  # TODO Jay: Do I not need this?
 
                 H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
                 eigenvalues, eigenvectors = self.find_eigval(H)
-                if h1 == 0.0 and h2 == -1.6:
-                    self.test_dataset(H, eigenvalues)  # SLOW!
+                # if h1 == 0.0 and h2 == -1.6:
+                # self.test_dataset(H, eigenvalues)  # SLOW!
                 vects.append([eigenvalues, eigenvectors, H])
 
                 # Write to file each time to avoid saving to ram
@@ -210,11 +209,9 @@ class Hamiltonian:
                     f.write(f"{h1, h2}_")  # Append h1, h2 for reference
                     for line in eigenvectors: f.write(str(line) + " ")
                     f.write("\n")
-
             # i += 1
             # if i % 10 == 0:
             #     self.calculate_time_remaining(h1_range * h2_range, s, i)
-
         return vects
     # def pool_func_for_mp(self, h1h2):
     #     h1, h2 = h1h2
@@ -247,11 +244,11 @@ class Hamiltonian:
 
     @staticmethod
     def find_eigval(H):
-        b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-4)
+        b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-16)
         return b, c.flatten()
 
-    def test_dataset(self, H, possible_eigenvalues):
 
+    def test_dataset(self, H, possible_eigenvalues):
         ww, vv = np.linalg.eig(H)  # Old method with linalg
         index = np.where(ww == np.amin(ww))
         npEigVal, npEigVec = ww[index], vv[:, index]
@@ -262,30 +259,20 @@ class Hamiltonian:
         each triple nested list is the first element of each eigenvector,
         not a list of eigenvectors like any sensical person would return.
         """ # np.linalg.eig is grade A stupid, change my mind...
-        eigValsList = []  # Converts np.eig to an output that's actually usable
+        eigVectList = []  # Converts np.eig to an output that's actually usable
         for eigVal in range(len(npEigVal)):
             tempVec = []
 
             for eigVec in range(len(npEigVec)):
                 tempVec.append(npEigVec[eigVec][0][eigVal])
-            eigValsList.append(np.array(tempVec))
-
-
-        # # sum_vec is the sum of all vectors returned by np.linalg.eig (the slow, 'right' one)
-        b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-16)
+            eigVectList.append(np.array(tempVec))
 
         # Test they're the same
-        sum_vec = np.sum(eigValsList, axis=0)
-
+        sum_vec = np.sum(eigVectList, axis=0)
         slowVectMag = sum_vec / np.linalg.norm(sum_vec)
+
         aa = (H @ slowVectMag) / possible_eigenvalues
         assert np.allclose(aa, np.array(slowVectMag, dtype=complex), 1e-9)
-
-        # Tests the inverse way too? TODO: JAAYYYYY
-        fastVectMag = c.flatten() / np.linalg.norm(c.flatten())
-        assert np.allclose((H @ fastVectMag) / npEigVal[0], np.array(fastVectMag, dtype=complex), 1e-9)
-
-
 
 
 X = np.array([[0, 1], [1, 0]], dtype=int)
@@ -294,23 +281,23 @@ II = sparse.dia_matrix((np.ones(2), np.array([0])), dtype=int, shape=(2, 2))
 
 if __name__ == '__main__':
     s = time.time()
-
-    filename = "test"
-
+    n = 8
     h1 = (0, 1.6)
     h2 = (-1.6, 1.6)
-    H = Hamiltonian(8, filename, h1, h2)
-    H.generate_data(64, 32)
 
     filename = "train"
-    H = Hamiltonian(8, filename, h1, h2)
+    H = Hamiltonian(n, filename, h1, h2)
     H.generate_data(40, 1)
+
+    filename = "test"
+    H = Hamiltonian(n, filename, h1, h2)
+    H.generate_data(64, 64)
+
     # print(find_kron_no_np.cache_info())
 
     print(f"Time for creating dataset was {time.time() - s} seconds")
 
     #
-    # h1h2_old, old = read_eigenvectors('example_test_data_n8.txt')
     # h1h2_new, new = read_eigenvectors('dataset_n=8_test.txt')
     #
     # print(np.array_equal(np.array(h1h2_old), np.array(h1h2_new)))
