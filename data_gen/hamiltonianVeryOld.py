@@ -132,13 +132,11 @@ class HamiltonianVeryOld:
 
 
     def calculate_hamiltonian(self):
-
         s = time.time()
         self.get_first_term()
         self.get_second_term()
         self.get_third_term()
         print(time.time() - s)
-
 
         s = time.time()
         i = 0

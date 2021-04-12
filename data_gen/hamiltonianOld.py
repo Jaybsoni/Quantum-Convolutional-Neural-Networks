@@ -183,6 +183,7 @@ class HamiltonianOld:
                 self.test_dataset(H, eigenvalues)
                 vects.append([eigenvalues, eigenvectors, H])
 
+                print(self.third_term)
                 # Write to file each time to avoid saving to ram
                 self.write_to_file(filename, h1, h2, eigenvectors)
                 # i += 1
@@ -256,7 +257,7 @@ if __name__ == '__main__':
     s = time.time()
     h1 = (0, 1.6)
     h2 = (-1.6, 1.6)
-    H = HamiltonianOld(6, h1, h2)
+    H = HamiltonianOld(8, h1, h2)
     H.generate_train_data(64, 64)
     # H.generate_test_data(32)
     # print(find_kron_no_np.cache_info())
