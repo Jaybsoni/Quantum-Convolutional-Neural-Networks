@@ -116,16 +116,26 @@ class Hamiltonian:
             Please see the attached photo in this directory named  _______________ 
             to show an example!
             """
+            # Maybe
             b1_rows, _ = sparse.coo_matrix(b1, dtype=sparse.coo_matrix).nonzero()
-            _, wrongly_ordered_b2_cols = sparse.coo_matrix(b2, dtype=sparse.coo_matrix).nonzero()
+            # _, b2_cols = sparse.coo_matrix(b2, dtype=sparse.coo_matrix).nonzero()
+
+            # Original
+            b1_rows, b1_cols = sparse.coo_matrix(b1, dtype=sparse.coo_matrix).nonzero()
+            b2_rows, wrongly_ordered_b2_cols = b1_cols, []
+            def extract_elem(elem):
+                wrongly_ordered_b2_cols.append(elem)
+
+            list(map(b2.getrow, filter(extract_elem, b2_rows)))
+
             """
-            There are clearer ways to calculate the B2_Cols, (below) but they are 
-            slower because they require calling .getrow() self.size times. This scales 
-            with the size of the hamiltonian, and is just as slow as using sparse.dot(), 
-            which is sadly too slow. Therefore, I'm using a property of the symmetry of 
-            B2 (the X tensor) under transformation to find what the values of B2_Cols are.  
-            Honestly, I know this works through over 6 hours of studying how B2 evolves, 
-            and working like crazy to find a more efficient method to compute the dot 
+            There are clearer ways to calculate the B2_Cols, (below) but they are
+            slower because they require calling .getrow() self.size times. This scales
+            with the size of the hamiltonian, and is just as slow as using sparse.dot(),
+            which is sadly too slow. Therefore, I'm using a property of the symmetry of
+            B2 (the X tensor) under transformation to find what the values of B2_Cols are.
+            Honestly, I know this works through over 6 hours of studying how B2 evolves,
+            and working like crazy to find a more efficient method to compute the dot
             product instead of using sparse.dot() (which is pretty darn efficient already)
             """
             # This commented out section is what I'm trying to mimic with the above map and the below for loop
@@ -135,23 +145,23 @@ class Hamiltonian:
             #     b2_col = str(b2.getrow(val)).split(")")[0].split(" ")[-1]
             #     b2_cols_slow.append(int(b2_col))
             """
-            If you were to print wrongly_ordered_B2_cols, and compare it to the B2_cols_slow 
-            in the commented out section above, you'd they'd be contain the same row numbers 
-            (makes sense since theres the same number of rows and each only has a single 1 
-            in them), but the orders are different. This is because wrongly_ordered_B2_cols 
-            doesn't account for the swapping nature that kron applies to X (print B2 and 
-            notice how the 1's alternate on two diagonals (those diagonals change too for 
-            a different n). If you print multiple different B2's for different qbits (n), 
-            you'll see the number of 1's that repeat on a diagonal before there's 0's changes 
-            for the number of qbits. This is exactly the property that causes 
-            wrongly_ordered_B2_cols to contain the rows, but in an incorrect order from 
-            B2_cols_slow. wrongly_ordered_B2_cols needs to have whole chunks of numbers 
-            swapped, but the size of the chunks and quantity of swaps depends on the 
-            iteration we are on (the value of elem, which summation we're on). So, the 
-            swaps variable below calculates how many blocks wrongly_ordered_B2_cols should 
+            If you were to print wrongly_ordered_B2_cols, and compare it to the B2_cols_slow
+            in the commented out section above, you'd they'd be contain the same row numbers
+            (makes sense since theres the same number of rows and each only has a single 1
+            in them), but the orders are different. This is because wrongly_ordered_B2_cols
+            doesn't account for the swapping nature that kron applies to X (print B2 and
+            notice how the 1's alternate on two diagonals (those diagonals change too for
+            a different n). If you print multiple different B2's for different qbits (n),
+            you'll see the number of 1's that repeat on a diagonal before there's 0's changes
+            for the number of qbits. This is exactly the property that causes
+            wrongly_ordered_B2_cols to contain the rows, but in an incorrect order from
+            B2_cols_slow. wrongly_ordered_B2_cols needs to have whole chunks of numbers
+            swapped, but the size of the chunks and quantity of swaps depends on the
+            iteration we are on (the value of elem, which summation we're on). So, the
+            swaps variable below calculates how many blocks wrongly_ordered_B2_cols should
             be divided into, and the variable groups splits up wrongly_ordered_B2_cols into
             that many chunks, evenly and without altering them.
-            
+
             An example of what wrongly_ordered_B2_cols would be compared to B2_cols_slow is:
                 wrongly_ordered_B2_cols = [a, b, c, d, e, f, g, h, i, j, k, l]
                 B2_cols_slow =  [d, e, f, a, b, c, j, k, l, g, h, i]
@@ -159,32 +169,32 @@ class Hamiltonian:
             but depending on the iteration of the summation (elem) we're on, it may be
                 wrongly_ordered_B2_cols = [a, b, c, d, e, f, g, h, i, j, k, l]
                 B2_cols_slow =  [c, d, a, b, g, h, e, f, k, l, i, j]
-            which is in chunks of two, or 
+            which is in chunks of two, or
                 wrongly_ordered_B2_cols = [a, b, c, d, e, f, g, h, i, j, k, l]
-                B2_cols_slow = [b, a, d, c, f, e, h, g, j, i, l, k] 
-            which is in chunks of 1. So we need to find out how big these chunks are that need 
-            to be swapped, and swap them.      
+                B2_cols_slow = [b, a, d, c, f, e, h, g, j, i, l, k]
+            which is in chunks of 1. So we need to find out how big these chunks are that need
+            to be swapped, and swap them.
             """
             b2_cols = []
             # How many groups the list should be separated into. (how big to make the chunks)
             swaps = int(pow(2, self.qbits - 1 - elem))
             groups = [wrongly_ordered_b2_cols[i:i + swaps] for i in range(0, len(wrongly_ordered_b2_cols), swaps)]
             """
-            Ref to above two lines. First, we need to find how big the chunks are, and 
+            Ref to above two lines. First, we need to find how big the chunks are, and
             separate wrongly_ordered_B2_cols into those chunks. For example, if:
                 wrongly_ordered_B2_cols = [a, b, c, d, e, f, g, h, i, j, k, l]
             and we want to break this into chunks of three, we would want to create:
                 groups = [[a, b, c], [d, e, f], [g, h, i], [j, k, l]]
             or if we wanted chunks of two:
                 groups = [[a, b], [c, d], [e, f], [g, h], [i, j], [k, l]]
-            so that we can swap them to 
+            so that we can swap them to
                 groups = [[d, e, f], [a, b, c], [j, k, l], [g, h, i]]
                 and
-                groups = [[c, d], [a, b], [g, h], [e, f], [k, l], [i, j]]  
+                groups = [[c, d], [a, b], [g, h], [e, f], [k, l], [i, j]]
             respectively. If the chunks were smaller, and we had:
-                [[a], [b], [c], [d], [e], [f]] 
+                [[a], [b], [c], [d], [e], [f]]
             then we would want to swap groups to get
-                [[b], [a], [d], [c], [f], [e]] 
+                [[b], [a], [d], [c], [f], [e]]
             So the below for loops performs this swap for a list of lists.
             """
             for j in range(int(len(groups) / 2)):  # Preform the swaps
@@ -243,7 +253,7 @@ class Hamiltonian:
             h = self.first_term + (self.second_term * h1) + (self.third_term * h2)
             # eigenvalue, eigenvector = self.find_eigval_with_np(h)  # Slower method with np
             eigenvalue, eigenvector = self.find_eigval_with_sparse(h)
-            self.test_dataset(h, eigenvalue)  # SLOW! Compares np.eig with sparse.eig
+            # self.test_dataset(h, eigenvalue)  # SLOW! Compares np.eig with sparse.eig
 
             # Write to file each time to avoid saving to ram
             with open(filename, 'a+') as f:
@@ -314,14 +324,16 @@ X.setdiag(np.ones(1), 1)
 
 if __name__ == '__main__':
     s = time.time()
-    n = 13
+    n = 6
 
     H = Hamiltonian(n)
     H.generate_data(40, 1, "train")
     H.generate_data(64, 64, "test")
+    print(H.third_term)
     print(f"Time for creating dataset was {time.time() - s} seconds")
 
-    # Verify
-    import check_hamiltonian
-    check_hamiltonian.test_dataset(n, "dataset_n=6_train.txt")
-    check_hamiltonian.test_dataset(n, "dataset_n=6_test.txt")
+    time.sleep(1)
+    import check_hamiltonian  # Verify
+    # NOTE: This is SLOW for large (bigger than 7) n values. This is due to checking with numpy.
+    check_hamiltonian.test_dataset(n, f"dataset_n={n}_train.txt", 1e-9)
+    check_hamiltonian.test_dataset(n, f"dataset_n={n}_test.txt", 1e-9)
