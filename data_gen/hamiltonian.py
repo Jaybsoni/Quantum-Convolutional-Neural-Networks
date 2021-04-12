@@ -1,322 +1,327 @@
 import os
-import sys
 import time
 import tqdm
-import psutil
 import itertools
 import numpy as np
-import multiprocessing as mp
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 
-from functools import lru_cache, wraps
-
-
-def np_cache(*args, **kwargs):
-    def decorator(function):
-        @wraps(function)
-        def wrapper(np_array, *args, **kwargs):
-            hashable_array = array_to_tuple(np_array)
-            # hashable_array = tuple(map(tuple, np_array))
-            return cached_wrapper(hashable_array, *args, **kwargs)
-
-        @lru_cache(*args, **kwargs)
-        def cached_wrapper(hashable_array, *args, **kwargs):
-            array = np.array(hashable_array)
-            return function(array, *args, **kwargs)
-
-        def array_to_tuple(np_array):
-            try:
-                return tuple(array_to_tuple(_) for _ in np_array)
-            except TypeError:
-                return np_array
-
-        # copy lru_cache attributes over too
-        wrapper.cache_info = cached_wrapper.cache_info
-        wrapper.cache_clear = cached_wrapper.cache_clear
-
-        return wrapper
-    return decorator
-
 
 def read_eigenvectors(file):
+    """
+    Takes a dataset and returns the h1h2 values that
+    are associated for the eigenvector for each line
+    :param file: str - file location
+    :return: tuple of list & np.array
+    """
     with open(file, 'r+') as f:
-        textData = f.readlines()
+        text_data = f.readlines()
 
         h_vals = []
-        for i in range(len(textData)):
-            h1h2, eigenvector = textData[i].split("_")
+        for i in range(len(text_data)):
+            h1h2, eigenvector = text_data[i].split("_")
 
             h_vals.append(tuple(map(float, h1h2[1: -1].split(', '))))
-            textData[i] = eigenvector
+            text_data[i] = eigenvector
 
-        return h_vals, np.loadtxt(textData, dtype=complex)
+        return h_vals, np.loadtxt(text_data, dtype=complex)
 
 
-def find_kron_no_np(array, index, n):
-    # before_w = psutil.virtual_memory().used / 1024 ** 2
-    if np.array_equal(array, X):
-        array = sparse.dia_matrix((np.array([np.ones(1)]), np.array([-1])), dtype=int, shape=(2, 2))
-        array.setdiag(np.ones(1), 1)
-    elif np.array_equal(array, Z):
-        array = sparse.dia_matrix((np.array([1, -1]), np.array([0])), dtype=int, shape=(2, 2))
-
-    assert index <= n  # n elements should always be larger than index for array
-    t = sparse.dia_matrix((pow(2, n), pow(2, n)), dtype=int)
-
-    # Creates a list of 1's setting the index value as 0 to represent the array parameter given
-    order = np.ones(n)
-    order[index-1] = 0
+def find_kron(array, index, q_bits):
+    order = np.ones(q_bits)
+    order[index-1] = 0  # Sets index as 0 to represent the array parameter given
+    assert index <= q_bits  # n elements should always be larger than index for array
+    t = sparse.dia_matrix((pow(2, q_bits), pow(2, q_bits)), dtype=int)
 
     for i in range(1, len(order)):
-        # Sets next element to Identity if next element is a 1, if zero, then array
+        # Sets next element to Identity if next element is a 1, else array (Z or X)
         current = array if order[i] == 0 else II
 
-        # print(i, len(order))
-        if i == 1:
-            # First time - compute kron(j-1, j)
-            last = array if order[i-1] == 0 else II
-            t = sparse.kron(last, current)
+        if i == 1:  # First time - compute kron(j-1, j)
+            t = array if order[i-1] == 0 else II
 
-        else:  # Computes kron of last element current matrix with next element
-            t = sparse.kron(t, current)
+        t = sparse.kron(t, current)
 
     return t.copy()
 
 
 class Hamiltonian:
-    def __init__(self, n=2, filename="", h1_metadata=(0, 1.6), h2_metadata=(-1.6, 1.6)):
-        self.n = n
+    def __init__(self, qbits=4, h1_metadata=(0, 1.6), h2_metadata=(-1.6, 1.6), v=1):
+        self.qbits = qbits
+        self.verbose = v
         self.h1_min, self.h1_max = h1_metadata
         self.h2_min, self.h2_max = h2_metadata
 
-        self.size = pow(2, self.n)
-        before_w = psutil.virtual_memory().used / 1024 ** 2  # MB
+        self.size = pow(2, self.qbits)
         self.first_term = np.zeros(shape=(self.size, self.size), dtype=float)
         self.second_term = np.zeros(shape=(self.size, self.size), dtype=float)
         self.third_term = np.zeros(shape=(self.size, self.size), dtype=float)
 
-        # Delete the output file if exists so we can append to a fresh ones.
-        self.filename = f'dataset_n={n}_' + filename + ".txt"
-        if os.path.isfile(self.filename): os.remove(self.filename)
-
-    def get_first_term_faster(self):
+    def get_first_term(self):
         self.first_term = np.zeros(shape=(self.size, self.size), dtype=float)
-        for i in range(self.n - 2):
-            # print(f"first term {i}/{self.n - 2}")
-            elem = i + 1  # math element is indexes at 1
 
-            AA = find_kron_no_np(Z, elem, self.n)
-            BB = find_kron_no_np(X, elem + 1, self.n)
-            CC = find_kron_no_np(Z, elem + 2, self.n)
+        for i in range(self.qbits - 2):
+            elem = i + 1  # math element is indexes at 1
+            if self.verbose: print(f"first term {elem}/{self.qbits - 2}")
+
+            a = find_kron(Z, elem, self.qbits)
+            b = find_kron(X, elem + 1, self.qbits)
+            c = find_kron(Z, elem + 2, self.qbits)
 
             # Instead of A.dot(B).dot(C), note that A and C are diagonal with 1's and -1's.
             # Convert A, C into vectors and just multiply them to B, a 45 000% speedup over dot product for n=14
-            a_diag = AA.diagonal()[..., None]
-            c_diag = CC.diagonal()[..., None]
-            ss_fast = BB.multiply(a_diag).multiply(c_diag)
+            a_diag = a.diagonal()[..., None]
+            c_diag = c.diagonal()[..., None]
+            combined = b.multiply(a_diag).multiply(c_diag)
 
-            self.first_term -= ss_fast.toarray()
+            self.first_term -= combined.toarray()
 
     def get_second_term(self):
         self.second_term = np.zeros(shape=(self.size, self.size), dtype=float)
-        for i in range(self.n):
-            # print(f"second term {i}/{self.n}")
-            self.second_term -= find_kron_no_np(X, i+1, self.n).toarray()
+        for i in range(self.qbits):
+            elem = i + 1  # math element is indexes at 1
+            if self.verbose: print(f"second term {elem}/{self.qbits}")
+            self.second_term -= find_kron(X, elem, self.qbits).toarray()
 
-    def get_third_term_faster(self):
+    def get_third_term(self):
         self.third_term = np.zeros(shape=(self.size, self.size), dtype=float)
         """
-        Honestly? This method is magic. It. Just. Works. Don't believe me? Try to make it faster....
+        Honestly? This method is magic. It. Just. Works. Don't believe me? Try to make it faster...
         :return:
         """
-        for i in range(self.n - 1):  # This is actually 1 to N-2, python indexing has self.n-1
-            # print(f"third term {i}/{self.n-1}")
-
+        for i in range(self.qbits - 1):  # This is actually 1 to N-2, python indexing has self.n-1
             elem = i + 1  # math element is indexes at 1
+            if self.verbose: print(f"third term {elem}/{self.qbits-1}")
 
-            B1 = find_kron_no_np(X, elem, self.n)
-            B2 = find_kron_no_np(X, elem + 1, self.n)
+            """
+            We want to take the dot product of B1 and B2, and subtract that value to 
+            self.third term for each value of elem. Problem? The dot product is 
+            a very inefficient operation for arrays that are sparse, both np.dot as 
+            well as sparse.dot(). So we had to find a way to do this faster!
+            """
+            b1 = find_kron(X, elem, self.qbits)
+            b2 = find_kron(X, elem + 1, self.qbits)
+            """
+            This is where the really clever symmetry starts. It only works for this use 
+            case, but by god we need it. If you truly want to understand this trick, I 
+            recommend creating 4x4 arrays on paper to understand why this property works. 
+            Consider you have two square 4x4 matricies, that have the special property 
+            that each row or column has only a sigle 1, the rest are 0's. Almost like a 
+            sudoku with 1's in a matrix of zeros, and all 1's should bu unique to that row 
+            or column. If this property holds true for both matricies, then if you take 
+            the dot product of these two matricies, the locations of the 1's on the 
+            resultant 4x4 matrix is at the locations of the rows of the first matrix 
+            with the column of the second matrix that has a 1 populated at the rowID 
+            that is the column of the 1 on the first matrix. Yeah. Hard to explain. 
+            Please see the attached photo in this directory named  _______________ 
+            to show an example!
+            """
+            b1_rows, _ = sparse.coo_matrix(b1, dtype=sparse.coo_matrix).nonzero()
+            _, wrongly_ordered_b2_cols = sparse.coo_matrix(b2, dtype=sparse.coo_matrix).nonzero()
+            """
+            There are clearer ways to calculate the B2_Cols, (below) but they are 
+            slower because they require calling .getrow() self.size times. This scales 
+            with the size of the hamiltonian, and is just as slow as using sparse.dot(), 
+            which is sadly too slow. Therefore, I'm using a property of the symmetry of 
+            B2 (the X tensor) under transformation to find what the values of B2_Cols are.  
+            Honestly, I know this works through over 6 hours of studying how B2 evolves, 
+            and working like crazy to find a more efficient method to compute the dot 
+            product instead of using sparse.dot() (which is pretty darn efficient already)
+            """
+            # This commented out section is what I'm trying to mimic with the above map and the below for loop
+            # b2_cols_slow = []  # Temp!
+            # for val in b2_rows:
+            #     # b2.getrow(val) is what makes this too slow
+            #     b2_col = str(b2.getrow(val)).split(")")[0].split(" ")[-1]
+            #     b2_cols_slow.append(int(b2_col))
+            """
+            If you were to print wrongly_ordered_B2_cols, and compare it to the B2_cols_slow 
+            in the commented out section above, you'd they'd be contain the same row numbers 
+            (makes sense since theres the same number of rows and each only has a single 1 
+            in them), but the orders are different. This is because wrongly_ordered_B2_cols 
+            doesn't account for the swapping nature that kron applies to X (print B2 and 
+            notice how the 1's alternate on two diagonals (those diagonals change too for 
+            a different n). If you print multiple different B2's for different qbits (n), 
+            you'll see the number of 1's that repeat on a diagonal before there's 0's changes 
+            for the number of qbits. This is exactly the property that causes 
+            wrongly_ordered_B2_cols to contain the rows, but in an incorrect order from 
+            B2_cols_slow. wrongly_ordered_B2_cols needs to have whole chunks of numbers 
+            swapped, but the size of the chunks and quantity of swaps depends on the 
+            iteration we are on (the value of elem, which summation we're on). So, the 
+            swaps variable below calculates how many blocks wrongly_ordered_B2_cols should 
+            be divided into, and the variable groups splits up wrongly_ordered_B2_cols into
+            that many chunks, evenly and without altering them.
+            
+            An example of what wrongly_ordered_B2_cols would be compared to B2_cols_slow is:
+                wrongly_ordered_B2_cols = [a, b, c, d, e, f, g, h, i, j, k, l]
+                B2_cols_slow =  [d, e, f, a, b, c, j, k, l, g, h, i]
+            Notice how changes are in chunks of three, so a, b, c was swapped with d, e, f;
+            but depending on the iteration of the summation (elem) we're on, it may be
+                wrongly_ordered_B2_cols = [a, b, c, d, e, f, g, h, i, j, k, l]
+                B2_cols_slow =  [c, d, a, b, g, h, e, f, k, l, i, j]
+            which is in chunks of two, or 
+                wrongly_ordered_B2_cols = [a, b, c, d, e, f, g, h, i, j, k, l]
+                B2_cols_slow = [b, a, d, c, f, e, h, g, j, i, l, k] 
+            which is in chunks of 1. So we need to find out how big these chunks are that need 
+            to be swapped, and swap them.      
+            """
+            b2_cols = []
+            # How many groups the list should be separated into. (how big to make the chunks)
+            swaps = int(pow(2, self.qbits - 1 - elem))
+            groups = [wrongly_ordered_b2_cols[i:i + swaps] for i in range(0, len(wrongly_ordered_b2_cols), swaps)]
+            """
+            Ref to above two lines. First, we need to find how big the chunks are, and 
+            separate wrongly_ordered_B2_cols into those chunks. For example, if:
+                wrongly_ordered_B2_cols = [a, b, c, d, e, f, g, h, i, j, k, l]
+            and we want to break this into chunks of three, we would want to create:
+                groups = [[a, b, c], [d, e, f], [g, h, i], [j, k, l]]
+            or if we wanted chunks of two:
+                groups = [[a, b], [c, d], [e, f], [g, h], [i, j], [k, l]]
+            so that we can swap them to 
+                groups = [[d, e, f], [a, b, c], [j, k, l], [g, h, i]]
+                and
+                groups = [[c, d], [a, b], [g, h], [e, f], [k, l], [i, j]]  
+            respectively. If the chunks were smaller, and we had:
+                [[a], [b], [c], [d], [e], [f]] 
+            then we would want to swap groups to get
+                [[b], [a], [d], [c], [f], [e]] 
+            So the below for loops performs this swap for a list of lists.
+            """
+            for j in range(int(len(groups) / 2)):  # Preform the swaps
+                switch = groups[2 * j:(2 * j) + 2]
+                b2_cols.append([*switch[1], *switch[0]])
 
-            B1_rows, B1_cols = sparse.coo_matrix(B1, dtype=sparse.coo_matrix).nonzero()
-            B2_rows = B1_cols
-            B2_cols0 = []
+            # [[b, a], [d, c]] -> [b, a, d, c]  # np.flatten() for lists
+            b2_cols = list(itertools.chain(*b2_cols))
 
-            def extract_elem(elem):
-                B2_cols0.append(elem)
-            list(map(B2.getrow, filter(extract_elem, B2_rows)))
+            # combined = B1.dot(B2), but now with the data we need for where all those 1's are.
+            combined = sparse.coo_matrix((np.ones(self.size, dtype=int), (b1_rows, b2_cols)),
+                                         shape=(self.size, self.size))
+            """
+            Old method to compare to confirm dot product is done correctly. 
+            This one line is what we replace with the above code. But the above 
+            code is *much* faster for larger qbits, as it minimizes the 
+            information we need to use to preform the dot product, and does so 
+            smartly without calling sparse.getrow() self.size times, which sadly 
+            was also inefficient. Also, we are not performing this calculation 
+            explicitly, as you clearly see. So the above method is much longer, 
+            but much faster too. A trade off we desperately needed for high qbits 
+            (anything larger than n=12, really)
+            """
+            # slow_method = B1.dot(B2)
+            # assert np.array_equal(slow_method.toarray(), coo.toarray())
+            self.third_term -= combined.toarray()
 
-            # Good = []  # Temp!
-            # for val in B2_rows:
-            #     B2_col = str(B2.getrow(val)).split(")")[0].split(" ")[-1]
-            #     # print(val, B2_cols[elem], B2_col)
-            #     Good.append(int(B2_col))
+    def generate_data(self, h1_range, h2_range, filename):
+        """
+        Given a filename, and h1 + h2 ranges, calculate the three terms used to
+        construct the hamiltonian in advance (unchanging between values of h1, h2)
+        and start to iterate through h1 and h2, appending to a text file each time
+        to avoid storing the huge dataset and saving once.
 
-            flat_list = []
-            swaps = int(pow(2, self.n - 1 - elem))  # How many groups the list should be seperated into
-            groups = [B2_cols0[i:i + swaps] for i in range(0, len(B2_cols0), swaps)]  # respective sections
-            for i in range(int(len(groups) / 2)):  # Preform the swaps
-                switch = groups[2 * i:(2 * i) + 2]
-                flat_list.append([*switch[1], *switch[0]])
-            # a = [[*groups[2 * i:(2 * i) + 2][1], *groups[2 * i:(2 * i) + 2][0]] for i in range(int(len(groups) / 2))]
-            flat_list = list(itertools.chain(*flat_list))
-
-            size = len(B1_rows)
-            coo = sparse.coo_matrix((np.ones(size, dtype=int), (B1_rows, flat_list)), shape=(size, size))
-
-            # Old method to compare to to confirm dot product is done correctly
-            # ss_slow = (B1.dot(B2)).toarray()
-            # print(f"dot vs new are equal?", np.array_equal(ss_slow, coo.toarray()))
-            # assert np.array_equal(ss_slow, coo.toarray())
-            self.third_term -= coo.toarray()
-
-    def convert_sec(self, t):
-        min = np.floor(t/60)
-        sec = round(t % 60, 2)
-        return "{}m-{:0.2f}s".format(int(min), sec)
-
-    def calculate_time_remaining(self, n, t0, i):
-        time_remaning = ((1 - (i/n)) * (time.time() - t0))  * (n/i)
-        percentage = (i / n) * 100
-        print("{:0.2f}% \tElapsed: {} \tRemaining: {}".format(percentage, self.convert_sec(time.time() - t0), self.convert_sec(time_remaning)))
-
-    def generate_data(self, h1_range, h2_range):
-        np.set_printoptions(threshold=np.inf)
-        s = time.time()
-        self.get_first_term_faster()
+        :param h1_range: float - # of steps to get from self.h1_min to self.h1_max
+        :param h2_range: float - # of steps to get from self.h2_min to self.h2_max
+        :param filename: filename start appending outputs to in streaming mode
+        :return:
+        """
+        t0 = time.time()
+        self.get_first_term()
         self.get_second_term()
-        self.get_third_term_faster()
-        print(time.time() - s)
+        self.get_third_term()
+        print(f"{round(time.time() - t0, 4)}s elapsed to calculate term")
 
+        # Delete the output file if exists so we can append to a fresh ones.
+        filename = f'dataset_n={self.qbits}_' + filename + ".txt"
+        if os.path.isfile(filename): os.remove(filename)
+
+        # Create a list of h1 and h2 values to loop over
         h1h2 = [[h1, h2] for h1 in np.linspace(self.h1_min, self.h1_max, h1_range)
                 for h2 in np.linspace(self.h2_min, self.h2_max, h2_range)]
-
-        s = time.time()
-        i = 1
-        # vects = []
         for h1, h2 in tqdm.tqdm(h1h2):
-            if h2_range == 1:
-                h2 = 0  # TODO Jay: Do I not need this?
+            if filename == "train": h2 = 0  # If in training mode, h2 should be 0!
 
-            H = self.first_term + (self.second_term * h1) + (self.third_term * h2)
-            eigenvalue, eigenvector = self.find_eigval(H)
-            # eigenvalues, eigenvector = self.find_eigval_with_np(H)
-            # if h1 == 0.0 and h2 == -1.6:
-            # self.test_dataset(H, eigenvalues)  # SLOW!
-            # vects.append([eigenvalues, eigenvector, H])
-
-            # if not np.isclose(np.linalg.norm(eigenvector), 1, atol=0.01):
-            #     print(h1, h2, np.linalg.norm(eigenvector))
+            h = self.first_term + (self.second_term * h1) + (self.third_term * h2)
+            # eigenvalue, eigenvector = self.find_eigval_with_np(h)  # Slower method with np
+            eigenvalue, eigenvector = self.find_eigval_with_sparse(h)
+            self.test_dataset(h, eigenvalue)  # SLOW! Compares np.eig with sparse.eig
 
             # Write to file each time to avoid saving to ram
-            with open(self.filename, 'a+') as f:
+            with open(filename, 'a+') as f:
                 f.write(f"{h1, h2}_")  # Append h1, h2 for reference
                 for line in eigenvector:
                     f.write(str(line) + " ")
                 f.write("\n")
 
-            # i += 1
-            # if i % 10 == 0:
-            #     self.calculate_time_remaining(h1_range * h2_range, s, i)
-        # return vects
-
     @staticmethod
-    def find_eigval(H):
-        b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-16)
+    def find_eigval_with_sparse(h):
+        """
+        Uses an approximation to find minimum eigenvalue and corresponding
+        eigenvector, works well for sparse Hamiltonians (Valid for this class)
+        :param h: np.array - 2D hamiltonian
+        :return: np.ndarray, np.ndarray - Minimum EigVal and EigVec
+        """
+        b, c = sparse.linalg.eigs(h, k=1, which='SR', tol=1e-16)
         return b, c.flatten()
 
     @staticmethod
-    def find_eigval_with_np(H):
-        ww, vv = np.linalg.eig(H)  # Old method with linalg
-        index = np.where(ww == np.amin(ww))
-        npEigVal, npEigVec = ww[index], vv[:, index]
-
-        eigVectList = []  # Converts np.eig to an output that's actually usable
-        for eigVal in range(len(npEigVal)):
-            tempVec = []
-
-            for eigVec in range(len(npEigVec)):
-                tempVec.append(npEigVec[eigVec][0][eigVal])
-            eigVectList.append(np.array(tempVec))
-
-        sum_vec = np.sum(eigVectList, axis=0)
-        slowVectVec = sum_vec / np.linalg.norm(sum_vec)
-        return npEigVal[0], slowVectVec
-
-        # b, c = sparse.linalg.eigs(H, k=1, which='SR', tol=1e-16)
-        # return b, c.flatten()
-
-
-    def test_dataset(self, H, possible_eigenvalues):
-        ww, vv = np.linalg.eig(H)  # Old method with linalg
-        index = np.where(ww == np.amin(ww))
-        npEigVal, npEigVec = ww[index], vv[:, index]
+    def find_eigval_with_np(h):
+        """
+        Uses the much slower way to find the minimized eigenvalue and corresponding
+        eigenvector of a hamiltonian. MUCH slower and very inefficient for large H
+        :param h: np.array - 2D hamiltonian
+        :return: float64, np.array - EigVal and EigVec
+        """
+        ww, vv = np.linalg.eig(h)  # Old method with linalg
+        index = np.where(ww == np.amin(ww))  # Find lowest eigenvalue
+        np_eig_vec, np_eig_val = vv[:, index], ww[index]  # Use index to find lowest eigenvector
 
         """
         np.linalg.eig returns the eigenvalues and vectors of a matrix
         BUT, it returns a list of lists of lists, where the elements of
         each triple nested list is the first element of each eigenvector,
         not a list of eigenvectors like any sensical person would return.
-        """ # np.linalg.eig is grade A stupid, change my mind...
-        eigVectList = []  # Converts np.eig to an output that's actually usable
-        for eigVal in range(len(npEigVal)):
-            tempVec = []
+        """  # np.linalg.eig is grade A stupid, change my mind...
+        eig_vect_list = []
+        for eigVal in range(len(np_eig_val)):
+            temp_vec = []
 
-            for eigVec in range(len(npEigVec)):
-                tempVec.append(npEigVec[eigVec][0][eigVal])
-            eigVectList.append(np.array(tempVec))
+            for eigVec in range(len(np_eig_vec)):
+                temp_vec.append(np_eig_vec[eigVec][0][eigVal])
+            eig_vect_list.append(np.array(temp_vec))
 
-        # Test they're the same
-        sum_vec = np.sum(eigVectList, axis=0)
-        slowVectVec = sum_vec / np.linalg.norm(sum_vec)
+        sum_vec = np.sum(eig_vect_list, axis=0)
 
-        aa = (H @ slowVectVec) / possible_eigenvalues
-        assert np.allclose(aa, np.array(slowVectVec, dtype=complex), 1e-9)
+        return np_eig_val[0], sum_vec / np.linalg.norm(sum_vec)
+
+    def test_dataset(self, h, possible_eigenvalue):
+        """
+        Computes the explicit eigenvector for a given Hamiltonian
+        to check if the eigenvalue is a valid eigenvalue
+        :param h: np.array - Hamiltonian
+        :param possible_eigenvalue: np.array
+        :return: N/A
+        """
+        _, np_eig_vec = self.find_eigval_with_np(h)
+        magnitude = (h @ np_eig_vec) / possible_eigenvalue
+
+        assert np.allclose(magnitude, np.array(np_eig_vec, dtype=complex), 1e-9)
 
 
-X = np.array([[0, 1], [1, 0]], dtype=int)
-Z = np.array([[1, 0], [0, -1]], dtype=int)
 II = sparse.dia_matrix((np.ones(2), np.array([0])), dtype=int, shape=(2, 2))
+Z = sparse.dia_matrix((np.array([1, -1]), np.array([0])), dtype=int, shape=(2, 2))
+X = sparse.dia_matrix((np.array([np.ones(1)]), np.array([-1])), dtype=int, shape=(2, 2))
+X.setdiag(np.ones(1), 1)
 
 if __name__ == '__main__':
     s = time.time()
-    n = 8
-    h1 = (0, 1.6)
-    h2 = (-1.6, 1.6)
+    n = 13
 
-    filename = "train"
-    H = Hamiltonian(n, filename, h1, h2)
-    H.generate_data(40, 1)
-
-    filename = "test"
-    H = Hamiltonian(n, filename, h1, h2)
-    H.generate_data(64, 64)
-
-    # print(find_kron_no_np.cache_info())
-
+    H = Hamiltonian(n)
+    H.generate_data(40, 1, "train")
+    H.generate_data(64, 64, "test")
     print(f"Time for creating dataset was {time.time() - s} seconds")
 
-    #
-    # h1h2_new, new = read_eigenvectors('dataset_n=8_test.txt')
-    #
-    # print(np.array_equal(np.array(h1h2_old), np.array(h1h2_new)))
-    #
-    # print(old.shape)
-    # print(new.shape)
-    # print(np.allclose(old, new, 1))
-    # print(np.allclose(old, new, atol=1))
-    # i = 0
-    # for a, b in zip(old, new):
-    #     if not np.allclose(old, new, 1e2):
-    #         i += 1
-    #         print("-")
-    #         print(np.allclose(old, new, 1e2))
-    #         print(a, b)
-    # print(i)
-
-    # flipped_pred_mat = new.reshape((64, 64), order='F')
-    # pred_mat = []
-    # for row_index in np.arange(len(flipped_pred_mat) - 1, -1, -1):
-    #     pred_mat.append(flipped_pred_mat[row_index])
-    #
-    # pred_mat = np.array(pred_mat)
+    # Verify
+    import check_hamiltonian
+    check_hamiltonian.test_dataset(n, "dataset_n=6_train.txt")
+    check_hamiltonian.test_dataset(n, "dataset_n=6_test.txt")
