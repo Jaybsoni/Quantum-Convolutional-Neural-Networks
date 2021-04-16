@@ -56,7 +56,7 @@ def controlled_pool(mat):
 
 # Layer Implement ################################################
 
-def legacy_conv4_layer_func(circ, params, active_qubits, barrier=True, kwargs={}, label='lc4'):
+def legacy_conv4_layer_func(circ, params, active_qubits, barrier=True, kwargs={}):
     """
     15 params, (one per gell mann mat)
     :param circ:
@@ -64,7 +64,6 @@ def legacy_conv4_layer_func(circ, params, active_qubits, barrier=True, kwargs={}
     :param active_qubits:
     :param barrier
     :param kwargs
-    :param label
     :return:
     """
     conv_operators = generate_gell_mann(4)  # 2 qubits operators
@@ -74,6 +73,11 @@ def legacy_conv4_layer_func(circ, params, active_qubits, barrier=True, kwargs={}
         index = kwargs["start_index"]
     else:
         index = 0
+
+    if "label" in kwargs:
+        label = kwargs["label"]
+    else:
+        label = 'lc4'
 
     while index + 3 < len(active_qubits):
         q_index = active_qubits[index]
@@ -87,6 +91,7 @@ def legacy_conv4_layer_func(circ, params, active_qubits, barrier=True, kwargs={}
         circ.unitary(u_conv, [q_index,   q_index_3], label=label)
         circ.unitary(u_conv, [q_index,   q_index_1], label=label)
         circ.unitary(u_conv, [q_index_2, q_index_3], label=label)
+        circ.barrier()
 
         if index == 0:
             index += 2
@@ -99,14 +104,13 @@ def legacy_conv4_layer_func(circ, params, active_qubits, barrier=True, kwargs={}
     return circ
 
 
-def legacy_conv_layer_func(circ, params, active_qubits, barrier=True, kwargs={}, label='lc'):
+def legacy_conv_layer_func(circ, params, active_qubits, barrier=True, kwargs={}):
     """
     :param circ:
     :param params: 63 parameters
     :param active_qubits:
     :param barrier:
     :param kwargs:
-    :param label:
     :return:
     """
     conv_operators = generate_gell_mann(8)  # 3 qubit operators
@@ -116,6 +120,11 @@ def legacy_conv_layer_func(circ, params, active_qubits, barrier=True, kwargs={},
         index = kwargs["start_index"]
     else:
         index = 0
+
+    if "label" in kwargs:
+        label = kwargs["label"]
+    else:
+        label = 'lc'
 
     while index + 2 < len(active_qubits):
         q_index = active_qubits[index]
@@ -131,19 +140,18 @@ def legacy_conv_layer_func(circ, params, active_qubits, barrier=True, kwargs={},
     return circ
 
 
-def legacy_pool_layer_func(circ, params, active_qubits, barrier=True, kwargs={}, label='lp'):
+def legacy_pool_layer_func(circ, params, active_qubits, barrier=True, kwargs={}):
     """
     :param circ:
-    :param params: 3 x 2 parameters
+    :param params: 3 x 2 parameters (6)
     :param active_qubits:
     :param barrier:
     :param kwargs:
-    :param label:
     :return:
     """
     pool_operators = generate_gell_mann(2)  # 1 qubit operators
-    v1 = get_conv_op(pool_operators, params[0])
-    v2 = get_conv_op(pool_operators, params[1])
+    v1 = get_conv_op(pool_operators, params[:3])  # first 3 parameters for V1, last 3 for V2
+    v2 = get_conv_op(pool_operators, params[3:])
     v1_pool = qi.Operator(controlled_pool(v1))
     v2_pool = qi.Operator(controlled_pool(v2))
 
@@ -151,6 +159,11 @@ def legacy_pool_layer_func(circ, params, active_qubits, barrier=True, kwargs={},
         index = kwargs["start_index"]
     else:
         index = 0
+
+    if "label" in kwargs:
+        label = kwargs["label"]
+    else:
+        label = 'lp'
 
     while index + 2 < len(active_qubits):
         q_index = active_qubits[index]        # control index 1
@@ -169,25 +182,61 @@ def legacy_pool_layer_func(circ, params, active_qubits, barrier=True, kwargs={},
     return circ
 
 
+def legacy_fc_layer_fun(circ, params, active_qubits, barrier=True, kwargs={}):
+    """
+    :param circ:
+    :param params:  num_active_qubits ^2 - 1  (same as the number of gm mats)
+    :param active_qubits:
+    :param barrier:
+    :param kwargs:
+    :return:
+    """
+    num_active_qubits = len(active_qubits)
+    fully_connected_mats = generate_gell_mann(2**num_active_qubits)
+    fully_connected_operator = get_conv_op(fully_connected_mats, params)
+
+    if "start_index" in kwargs:
+        index = kwargs["start_index"]
+    else:
+        index = 0
+
+    if "label" in kwargs:
+        label = kwargs["label"]
+    else:
+        label = 'fc'
+
+    circ.unitary(fully_connected_operator, active_qubits, label=label)
+
+    if barrier:
+        circ.barrier()
+
+    return circ
+
+
 # Layer class ######################################################################
 class Layer:
 
-    def __init__(self, name, func):
+    def __init__(self, name, func, param_shape):
         self.name = name
         self.func = func
+        self.shape_params = param_shape
         return
 
-    def apply_layer(self, circ, params, active_qubits, kwargs={}, label=None):
-        if label is not None:
-            new_circ = self.func(circ, params, active_qubits, kwargs=kwargs, label=label)
-        else:
-            new_circ = self.func(circ, params, active_qubits, kwargs=kwargs)  # each gate has its own unique label
-        return new_circ
+    def apply_layer(self, circ, params, active_qubits, kwargs={}):
+        inst = self.func(circ, params, active_qubits, kwargs=kwargs)  # each gate has its own unique label
+        return inst
 
 
-legacy_conv4_layer = Layer("legacy_conv4_layer", legacy_conv4_layer_func)
-legacy_conv_layer = Layer("legacy_conv_layer", legacy_conv_layer_func)
-legacy_pool_layer = Layer("legacy_pool_layer", legacy_pool_layer_func)
+# ugly temp function because im not sure how to make this cleaner right now
+def get_legacy_fc_layer(num_active_qubits):
+    layer_name = "legacy_fc_layer_n{}".format(num_active_qubits)
+    fc_layer = Layer(layer_name, legacy_fc_layer_fun, (2**num_active_qubits - 1,))
+    return fc_layer
+
+
+legacy_conv4_layer = Layer("legacy_conv4_layer", legacy_conv4_layer_func, (15,))
+legacy_conv_layer = Layer("legacy_conv_layer", legacy_conv_layer_func, (63,))
+legacy_pool_layer = Layer("legacy_pool_layer", legacy_pool_layer_func, (6,))
 
 
 def main():
