@@ -6,6 +6,7 @@ from qiskit import QuantumCircuit
 from qiskit import quantum_info as qi
 import itertools
 import multiprocessing as mp
+import pickle
 
 
 class QcnnStruct:
