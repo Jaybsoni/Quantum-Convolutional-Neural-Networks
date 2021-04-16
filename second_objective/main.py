@@ -1,63 +1,108 @@
-import copy
-import random
+import time, math, pickle
+import json, sys
 import numpy as np
+import matplotlib.pyplot as plt
 
-# Create canvas array
-dim = 3
-grid = np.zeros((dim, dim))
+import torch
+from torch.autograd import Variable
+import torch.optim as optim
 
-# Create general shapes of tetris blocks
-line = np.array([[1], [1], [1]])
-cw = np.array([[1, 1],
-               [1, 0]])
-
-# Create empty arrays where tetris block rotations will be put into
-rotations_list = []
-lines_list = []
+import nn
+import generate_tetris_blocks as gtb
 
 
-# Comment
-def add_array_to_grid(grid, shape, shape_list, i, j, i_shift, j_shift):
-    try:  # Try to add shape to grid, some combinations may fail due to indexing overflow
-        grid[i:i + i_shift, j:j + j_shift] =  shape # Insert into grid
-    except ValueError:  # Indexing overflow, ignore example (not valid location on grid)
-        pass
-    else:
-        is_array_in_list = next((True for elem in shape_list if np.array_equal(elem, grid)), False)
-        if not is_array_in_list:
-            shape_list.append(grid)  # Append to list of rotation combinations
+sys.path.append('src')
+
+def plot_results(obj_vals, cross_vals, filename):
+    assert len(obj_vals) == len(cross_vals), 'Length mismatch between the curves'
+    num_epochs = len(obj_vals)
+
+    # Plot saved in results folder
+    plt.plot(range(num_epochs), obj_vals, label="Training loss", color="blue")
+    plt.plot(range(num_epochs), cross_vals, label="Test loss", color="green")
+    plt.legend()
+    plt.savefig(filename + '.pdf')
+    plt.close()
+
+def train_model(param, model, data):
+    # Define an optimizer and the loss function
+    optimizer = optim.SGD(model.parameters(), lr=param['learning_rate'])
+    loss = torch.nn.BCELoss(reduction='mean')
+
+    obj_vals = []
+    cross_vals = []
+    num_epochs = int(param['num_epochs'])
+
+    # Training loop
+    for epoch in range(1, num_epochs + 1):
+        obj_vals.append(model.backprop(data, loss, optimizer))
+        cross_vals.append(model.test(data, loss))
+
+        # High verbosity report in output stream
+        if v >= 2 and not ((epoch + 1) % param['display_epochs']):
+            train_cor, train_tot = model.accuracy(data.x_train, data.y_train)
+            test_cor, test_tot1 = model.accuracy(data.x_test, data.y_test)
+
+            t = time.time() - start_time
+            print('Epoch [{}/{}] - {}m{:.2f}s -'.format(epoch + 1, num_epochs, math.floor(t / 60), t % 60) +
+                  '\tTraining Loss: {:.4f}  - '.format(obj_vals[-1]) +
+                  'Training Accuracy: {}/{} ({:.2f}%)  -'.format(train_cor, train_tot, 100 * train_cor/train_tot) +
+                  'Test Loss: {:.4f}  - '.format(cross_vals[-1]) +
+                  'Test Accurecy: {}/{} ({:.2f}%)'.format(test_cor, test_tot1, 100 * test_cor/test_tot1))
+
+    # Low verbosity final report
+    if v >= 1:
+        print('Final training loss: {:.4f} \t Final test loss: {:.4f}'.format(obj_vals[-1], cross_vals[-1]))
+
+    return obj_vals, cross_vals
 
 
-# Find all combinations of cw and line shape in the canvas (grid)
-for i in range(dim):  # Iterate through column index
-    for j in range(dim):  # Iterate through row index
 
-        for rot in range(4):  # Iterate through all rotations of 2x2 cw array
-            shape = np.rot90(cw, rot)
-            grid_copy = copy.deepcopy(grid)  # Make a copy of the grid
-            add_array_to_grid(grid_copy, shape, rotations_list, i, j, 2, 2)
+if __name__ == '__main__':
+    start_time = time.time()
+    v = 1
+    filename = "temp"
 
-        grid_copy = copy.deepcopy(grid)  # Make a copy of the grid
-        add_array_to_grid(grid_copy, line.T[0], lines_list, i, j, 1, 3)
+    # Hyperparameters from json file are loaded
+    with open("param.json") as paramfile:
+        param = json.load(paramfile)
 
-        grid_copy = copy.deepcopy(grid)  # Make a copy of the grid
-        add_array_to_grid(grid_copy, line, lines_list, i, j, 3, 1)
+    # Create an instance of the model and initialize the data
+    model = nn.Net()
 
+    data = gtb.TetrisData(4)
+    data.generate_combinations_of_tetris_blocks()
+    data.package_data()
 
-# # print(rotations_list)
-# for elem in lines_list:
-#     print(elem)
-# #
-# for elem in rotations_list:
-#     print(elem)
+    if v:
+        print(f"\n Learning rate given as {param['learning_rate']}, "
+              f"with {param['num_epochs']} Epochs, and a verbosity of {v}\n"
+              f"No model given, training new model")
 
+    obj_vals, cross_vals = train_model(param, model, data)
 
-def partition(list_in, n):
-    random.shuffle(list_in)
-    return [list_in[i::n] for i in range(n)]
+    # Save the model and the picked data
+    torch.save(model.state_dict(), filename + ".pth")
 
-x = partition(lines_list, 2)
-for i in x:
-    print("_")
-    for elem in i:
-        print(elem)
+    # Save the training and test losses
+    with open(filename + ".pkl", 'wb') as pfile:
+        pickle.dump((obj_vals, cross_vals), pfile)
+
+    # if v:
+    #     print(f"\n Learning rate given as {param['exec']['learning_rate']}, "
+    #           f"with {param['exec']['num_epochs']} Epochs, and a verbosity of {args.v}\n"
+    #           f"Model given, attempting to load it")
+    #
+    # model.load_state_dict(torch.load(filename + ".pth"))
+    # with open(filename + ".pkl", 'rb') as pfile:
+    #     obj_vals, cross_vals = pickle.load(pfile)
+
+    plot_results(obj_vals, cross_vals, filename)
+
+    # Print final loss/acceptances
+    if v:
+        t = time.time() - start_time
+        correct, total = model.accuracy(data.x_test, data.y_test)
+        print("\nAfter training, we find the model has a test loss of {:.3f} ".format(cross_vals[-1]) +
+              "and an accuracy of {}/{}, or {:.3f}%\n".format(correct, total, (correct/total) * 100) +
+              "This was completed in {} minutes and {:.2f} seconds".format(math.floor(t / 60), t % 60))
