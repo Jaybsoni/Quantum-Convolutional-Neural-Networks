@@ -2,21 +2,31 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as func
-
 
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(16, 12)
-        self.fc2 = nn.Linear(12, 8)
-        self.fc3 = nn.Linear(8, 2)
+        self.conv1 = nn.Conv2d(1, 1, kernel_size=2, padding=1, stride=1)
+        self.conv2 = nn.Conv2d(1, 1, kernel_size=2, stride=1)
+        self.conv3 = nn.Conv2d(1, 1, kernel_size=2, stride=1)
+
+        self.struct = nn.Sequential(self.conv1, nn.ReLU(),
+                                    self.conv2, nn.ReLU(),
+                                    self.conv3, nn.Sigmoid())
 
     # Feedforward function
     def forward(self, x):
-        h = func.relu(self.fc1(x))
-        h = func.relu(self.fc2(h))
-        h = torch.sigmoid(self.fc3(h))
+        import time
+        h = self.struct(x)
+        # print(x.shape)
+        # h = self.conv1(x)
+        # print(h.shape)
+        # time.sleep(1)
+        # h = nn.ReLU()
+        # time.sleep(1)
+
+        # h = func.relu(self.conv2(h))
+        # h = torch.sigmoid(self.conv3(h))
         return h
 
     # Reset function for the training weights
@@ -29,12 +39,14 @@ class Net(nn.Module):
     # Backpropagation function
     def backprop(self, data, loss, optimizer):
         self.train()
-        inputs = torch.from_numpy(data.x_train)
-        targets = torch.from_numpy(data.y_train)
+
+        batch_size = data.x_train.shape[0]
+        inputs = torch.from_numpy(np.reshape(data.x_train, (batch_size, 1, 4, 4))).float()
+        targets = torch.from_numpy(data.y_train).float()
         # An alternative to what you saw in the jupyter notebook is to
         # flatten the output tensor. This way both the targets and the model
         # outputs will become 1-dim tensors.
-        obj_val = loss(self.forward(inputs).reshape(-1), targets)
+        obj_val = loss(self.forward(inputs), targets)
         optimizer.zero_grad()
         obj_val.backward()
         optimizer.step()
