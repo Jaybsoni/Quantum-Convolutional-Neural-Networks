@@ -1,19 +1,21 @@
 # qcnn
 import copy
-import numpy as np
-from layers import legacy_conv4_layer, legacy_conv_layer, legacy_pool_layer
-from qiskit import QuantumCircuit
-from qiskit import quantum_info as qi
 import itertools
 import multiprocessing as mp
 import pickle
 
+import numpy as np
+from qiskit import QuantumCircuit
+from qiskit import quantum_info as qi
+
+from qml import layers
+
 
 class QcnnStruct:
 
-    Layers = {legacy_conv4_layer.name: legacy_conv4_layer,
-              legacy_conv_layer.name: legacy_conv_layer,
-              legacy_pool_layer.name: legacy_pool_layer}
+    Layers = {layers.legacy_conv4_layer.name: layers.legacy_conv4_layer,
+              layers.legacy_conv_layer.name: layers.legacy_conv_layer,
+              layers.legacy_pool_layer.name: layers.legacy_pool_layer}
 
     def __init__(self, num_qubits):
         self.num_qubits = num_qubits
@@ -208,13 +210,13 @@ class Qcnn(QcnnStruct):
         return (-1 * sums) + (1 * (1 - sums))
 
     @staticmethod
-    def export_params(qcnn_struct, params):
-        with open('model.pkl', 'wb') as file:
+    def export_params(qcnn_struct, params, fname="model.pkl"):
+        with open(fname, 'wb') as file:
             pickle.dump((qcnn_struct, params), file)  # Save data as pickle
 
     @staticmethod
-    def import_params():
-        with open('model.pkl', 'rb') as file:
+    def import_params(fname="model.pkl"):
+        with open(fname, 'rb') as file:
             qcnn_struct, params = pickle.load(file)  # Call load method to deserialze
 
         return qcnn_struct, params
