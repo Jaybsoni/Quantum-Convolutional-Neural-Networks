@@ -206,6 +206,18 @@ class Qcnn(QcnnStruct):
 
         return (-1 * sums) + (1 * (1 - sums))
 
+    @staticmethod
+    def export_params(qcnn_struct, params):
+        with open('model.pkl', 'wb') as file:
+            pickle.dump((qcnn_struct, params), file)  # Save data as pickle
+
+    @staticmethod
+    def import_params():
+        with open('model.pkl', 'rb') as file:
+            qcnn_struct, params = pickle.load(file)  # Call load method to deserialze
+
+        return qcnn_struct, params
+
 
 def main():
     return
