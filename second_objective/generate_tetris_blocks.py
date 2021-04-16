@@ -37,7 +37,9 @@ class TetrisData():
             if not is_array_in_list: # If unique entry
                 shape_list.append(grid)  # Append to list of combinations
 
-    def generate_blocks(self):
+    def generate_combinations_of_tetris_blocks(self):
+        self.rotations_list, self.lines_list = [], []
+
         # Find all combinations of cw and line shape in the canvas (grid)
         for i in range(self.dim):  # Iterate through column index
             for j in range(self.dim):  # Iterate through row index
@@ -60,21 +62,23 @@ class TetrisData():
         d_train, d_val, d_test = list_in[: bound1], list_in[bound1:bound2], list_in[bound2:]
         return d_train, d_val, d_test
 
-    def generate_data(self):
+    def package_data(self):
         # Separate lines_list and rotations_list into training, validation, and testing sets
         lines_train, lines_validate, lines_test = self.split_data(self.lines_list, 0.5, 0.3, 0.2)
         rots_train, rots_validate, rots_test = self.split_data(self.rotations_list, 0.5, 0.3, 0.2)
 
         # Extract the lines and rotations lists together
-        self.x_train = *lines_train, *rots_train
-        self.y_train = len(lines_train), len(rots_train)
+        self.x_train = np.array([*lines_train, *rots_train])
+        self.y_train = np.array([*[[1, 0]] * len(lines_train), *[[0, 1]] * len(rots_train)])
 
-        print(self.y_train)
-        self.validate_dataset = *lines_validate, *rots_validate
-        self.test_dataset = *lines_test, *rots_test
+        self.x_validate = np.array([*lines_validate, *rots_validate])
+        self.y_validate = np.array([*[[1, 0]] * len(lines_validate), *[[0, 1]] * len(rots_validate)])
+
+        self.x_test = np.array([*lines_test, *rots_test])
+        self.y_test = np.array([*[[1, 0]] * len(lines_test), *[[0, 1]] * len(rots_test)])
 
 
 if __name__ == '__main__':
     data = TetrisData(4)
-    data.generate_blocks()
-    data.generate_data()
+    data.generate_combinations_of_tetris_blocks()
+    data.package_data()
