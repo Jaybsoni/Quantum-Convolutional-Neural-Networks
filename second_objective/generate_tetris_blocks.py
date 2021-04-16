@@ -62,11 +62,14 @@ class TetrisData():
 
     def generate_data(self):
         # Separate lines_list and rotations_list into training, validation, and testing sets
-        lines_train, lines_validate, lines_test = self.split_data(data.lines_list, 0.5, 0.3, 0.2)
-        rots_train, rots_validate, rots_test = self.split_data(data.rotations_list, 0.5, 0.3, 0.2)
+        lines_train, lines_validate, lines_test = self.split_data(self.lines_list, 0.5, 0.3, 0.2)
+        rots_train, rots_validate, rots_test = self.split_data(self.rotations_list, 0.5, 0.3, 0.2)
 
         # Extract the lines and rotations lists together
-        self.train_dataset = *lines_train, *rots_train
+        self.x_train = *lines_train, *rots_train
+        self.y_train = len(lines_train), len(rots_train)
+
+        print(self.y_train)
         self.validate_dataset = *lines_validate, *rots_validate
         self.test_dataset = *lines_test, *rots_test
 
