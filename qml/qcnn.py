@@ -1,23 +1,18 @@
 # qcnn
 import copy
 import numpy as np
-from layers import legacy_conv4_layer, legacy_conv_layer, legacy_pool_layer, get_legacy_fc_layer
+from layers import legacy_conv4_layer, legacy_conv_layer, legacy_pool_layer
 from qiskit import QuantumCircuit
 from qiskit import quantum_info as qi
 import itertools
 import multiprocessing as mp
-import myQiskit as mQ
-
-legacy_fc_layer_n8 = get_legacy_fc_layer(8//3)
-legacy_fc_layer_n8.name += "_n8"
 
 
 class QcnnStruct:
 
     Layers = {legacy_conv4_layer.name: legacy_conv4_layer,
               legacy_conv_layer.name: legacy_conv_layer,
-              legacy_pool_layer.name: legacy_pool_layer,
-              legacy_fc_layer_n8.name: legacy_fc_layer_n8}
+              legacy_pool_layer.name: legacy_pool_layer}
 
     def __init__(self, num_qubits):
         self.num_qubits = num_qubits
@@ -25,7 +20,7 @@ class QcnnStruct:
         self.structure = []
         self.params = []
 
-    def add_layer(self, layer, kwargs):
+    def add_layer(self, layer, kwargs={}):
         self.structure.append((layer.name, kwargs))
         return
 
@@ -52,11 +47,6 @@ class QcnnStruct:
 
     @staticmethod
     def get_updated_active_qubits(active_qubits, group_len, target):
-        # print(len(active_qubits))
-        # print(group_len)
-        # print(active_qubits)
-        ## FIX THIS !!!
-        # assert len(active_qubits) % group_len == 0
         num_groups = len(active_qubits) // group_len
         update_qubits = []
 
@@ -136,7 +126,6 @@ class Qcnn(QcnnStruct):
         for index, wf in enumerate(input_wfs):
             state = self.embedding(wf)
             state = state.evolve(circ)
-            # state = mQ.my_evolve(circ, self.num_qubits, self.embedding(wf))
 
             predictions[index] = self.middle_qubit_exp_value(state)
 
@@ -154,7 +143,7 @@ class Qcnn(QcnnStruct):
                 for i in [1, -1]:
                     self.params[layer_index][param_index] += i * epsilon  # shift params
                     grad += i * self.mse_loss(self.forward(input_wfs, self.params.copy()), labels)
-                    self.params = original_params.copy()  # reset params to original values
+                    self.params = copy.deepcopy(original_params)  # reset params to original values
                 layer_grad[param_index] = grad / 2 * epsilon
 
             gradient_mat.append(layer_grad)
@@ -165,10 +154,10 @@ class Qcnn(QcnnStruct):
         i, j = indexes
         grad = 0
 
-        for i in [1, -1]:
+        for k in [1, -1]:
             params = copy.deepcopy(self.params)
-            params[i][j] += i * epsilon  # shift params
-            grad += i * self.mse_loss(self.forward(input_wfs, params), labels)
+            params[i][j] += k * epsilon  # shift params
+            grad += k * self.mse_loss(self.forward(input_wfs, params), labels)
 
         layer_grad = grad / 2 * epsilon
         return i, j, layer_grad
@@ -177,13 +166,13 @@ class Qcnn(QcnnStruct):
         indexes = [(i, j) for i, val in enumerate(self.params) for j, _ in enumerate(val)]
 
         p = mp.Pool(mp.cpu_count())
-        MS = p.starmap(self.pool_func_for_mp, zip(indexes,
-                                                  itertools.repeat(input_wfs),
-                                                  itertools.repeat(labels),
-                                                  itertools.repeat(epsilon)))
+        grad_tuple = p.starmap(self.pool_func_for_mp, zip(indexes,
+                                                          itertools.repeat(input_wfs),
+                                                          itertools.repeat(labels),
+                                                          itertools.repeat(epsilon)))
 
         gradient_mat = copy.deepcopy(self.params)
-        for i, j, val in MS:
+        for i, j, val in grad_tuple:
             gradient_mat[i][j] = val
 
         return gradient_mat
@@ -206,15 +195,14 @@ class Qcnn(QcnnStruct):
         return loss / num_entries
 
     def middle_qubit_exp_value(self, state_vect):
-        final_active_qubits = self.get_final_state_active_qubits()  ### SLOW
+        final_active_qubits = self.get_final_state_active_qubits()
         middle_qbit = final_active_qubits[len(final_active_qubits) // 2]  # this is the index of the middle qubit
 
-        # the actual vector of a1, a2, ... , a2^n in np.array form
         probability_vector = (np.abs(np.array(state_vect.data))) ** 2
 
         all_binary_combs = list(map(list, itertools.product([0, 1], repeat=self.num_qubits)))
-        newLst = np.array([elem for elem, val in enumerate(all_binary_combs) if val[middle_qbit] == 1])
-        sums = np.sum(probability_vector[newLst])
+        new_lst = np.array([elem for elem, val in enumerate(all_binary_combs) if val[middle_qbit] == 1])
+        sums = np.sum(probability_vector[new_lst])
 
         return (-1 * sums) + (1 * (1 - sums))
 

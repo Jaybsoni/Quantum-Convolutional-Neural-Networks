@@ -229,7 +229,8 @@ class Layer:
 
 # ugly temp function because im not sure how to make this cleaner right now
 def get_legacy_fc_layer(num_active_qubits):
-    fc_layer = Layer("legacy_fc_layer", legacy_fc_layer_fun, (2**num_active_qubits - 1,))
+    layer_name = "legacy_fc_layer_n{}".format(num_active_qubits)
+    fc_layer = Layer(layer_name, legacy_fc_layer_fun, (2**num_active_qubits - 1,))
     return fc_layer
 
 
