@@ -85,12 +85,12 @@ def legacy_conv4_layer_func(circ, params, active_qubits, barrier=True, kwargs={}
         q_index_2 = active_qubits[index + 2]
         q_index_3 = active_qubits[index + 3]
 
-        circ.unitary(u_conv, [q_index_1, q_index_2], label=label)
-        circ.unitary(u_conv, [q_index_1, q_index_3], label=label)
-        circ.unitary(u_conv, [q_index,   q_index_2], label=label)
-        circ.unitary(u_conv, [q_index,   q_index_3], label=label)
-        circ.unitary(u_conv, [q_index,   q_index_1], label=label)
         circ.unitary(u_conv, [q_index_2, q_index_3], label=label)
+        circ.unitary(u_conv, [q_index, q_index_1], label=label)
+        circ.unitary(u_conv, [q_index, q_index_3], label=label)
+        circ.unitary(u_conv, [q_index, q_index_2], label=label)
+        circ.unitary(u_conv, [q_index_1, q_index_3], label=label)
+        circ.unitary(u_conv, [q_index_1, q_index_2], label=label)
         circ.barrier()
 
         if index == 0:
