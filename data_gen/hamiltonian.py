@@ -218,11 +218,13 @@ class Hamiltonian:
             but much faster too. A trade off we desperately needed for high qbits 
             (anything larger than n=12, really)
             """
+            # The above code is over hundreds of times faster than using dot product (for n=10 I believe), don't
+            # have the energy
             # slow_method = B1.dot(B2)
             # assert np.array_equal(slow_method.toarray(), coo.toarray())
             self.third_term -= combined.toarray()
 
-    def generate_data(self, h1_range, h2_range, filename):
+    def generate_data(self, h1_range, h2_range, name):
         """
         Given a filename, and h1 + h2 ranges, calculate the three terms used to
         construct the hamiltonian in advance (unchanging between values of h1, h2)
@@ -241,19 +243,24 @@ class Hamiltonian:
         print(f"{round(time.time() - t0, 4)}s elapsed to calculate term")
 
         # Delete the output file if exists so we can append to a fresh ones.
-        filename = f'dataset_n={self.qbits}_' + filename + ".txt"
+        filename = f'dataset_n={self.qbits}_' + name + ".txt"
         if os.path.isfile(filename): os.remove(filename)
 
         # Create a list of h1 and h2 values to loop over
         h1h2 = [[h1, h2] for h1 in np.linspace(self.h1_min, self.h1_max, h1_range)
                 for h2 in np.linspace(self.h2_min, self.h2_max, h2_range)]
         for h1, h2 in tqdm.tqdm(h1h2):
-            if filename == "train": h2 = 0  # If in training mode, h2 should be 0!
+
+            if name == "train": h2 = 0  # If in training mode, h2 should be 0!
 
             h = self.first_term + (self.second_term * h1) + (self.third_term * h2)
-            # eigenvalue, eigenvector = self.find_eigval_with_np(h)  # Slower method with np
-            eigenvalue, eigenvector = self.find_eigval_with_sparse(h)
-            # self.test_dataset(h, eigenvalue)  # SLOW! Compares np.eig with sparse.eig
+
+            if h1 == 0:
+                # Used for h1 == 0 due to eigenvector degeneracy
+                eigenvalue, eigenvector = self.find_eigval_with_np(h)  # Slower method with np
+            else:
+                eigenvalue, eigenvector = self.find_eigval_with_sparse(h)
+                # self.test_dataset(h, eigenvalue)  # SLOW! Compares np.eig with sparse.eig
 
             # Write to file each time to avoid saving to ram
             with open(filename, 'a+') as f:
@@ -324,7 +331,7 @@ X.setdiag(np.ones(1), 1)
 
 if __name__ == '__main__':
     s = time.time()
-    n = 6
+    n = 9
 
     H = Hamiltonian(n)
     H.generate_data(40, 1, "train")
@@ -332,8 +339,8 @@ if __name__ == '__main__':
     print(H.third_term)
     print(f"Time for creating dataset was {time.time() - s} seconds")
 
-    time.sleep(1)
-    import check_hamiltonian  # Verify
-    # NOTE: This is SLOW for large (bigger than 7) n values. This is due to checking with numpy.
-    check_hamiltonian.test_dataset(n, f"dataset_n={n}_train.txt", 1e-9)
-    check_hamiltonian.test_dataset(n, f"dataset_n={n}_test.txt", 1e-9)
+    # time.sleep(1)
+    # import check_hamiltonian  # Verify
+    # # NOTE: This is SLOW for large (bigger than 7) n values. This is due to checking with numpy.
+    # check_hamiltonian.test_dataset(n, f"dataset_n={n}_train.txt", 1e-9)
+    # check_hamiltonian.test_dataset(n, f"dataset_n={n}_test.txt", 1e-9)
