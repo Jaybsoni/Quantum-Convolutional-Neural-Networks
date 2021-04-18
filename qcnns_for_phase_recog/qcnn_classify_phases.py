@@ -1,9 +1,8 @@
 import os
 import sys
 import copy
-import pickle
 import numpy as np
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 
 sys.path.insert(0, "../qml_src/")
 from qml import qcnn as q
@@ -12,16 +11,16 @@ from qml import layers as cl  # custom layers
 
 def read_eigenvectors(file):
     with open(file, 'r+') as f:
-        textData = f.readlines()
+        textdata = f.readlines()
 
         h_vals = []
-        for i in range(len(textData)):
-            h1h2, eigenvector = textData[i].split("_")
+        for i in range(len(textdata)):
+            h1h2, eigenvector = textdata[i].split("_")
 
             h_vals.append(tuple(map(float, h1h2[1: -1].split(', '))))
-            textData[i] = eigenvector
+            textdata[i] = eigenvector
 
-        return h_vals, np.loadtxt(textData, dtype=complex)
+        return h_vals, np.loadtxt(textdata, dtype=complex)
 
 
 def plot_heat_map(pred_mat, fname_save, title="2-D Heat Map", save_path="./results/"):
@@ -49,15 +48,7 @@ def plot_heat_map(pred_mat, fname_save, title="2-D Heat Map", save_path="./resul
     return
 
 
-<<<<<<< HEAD
-def main():
-    num_qubits = 9
-    training_fname = "./data/dataset_n=9_train.txt"
-    test_fname = "./data/dataset_n=9_test.txt"
-
-=======
 def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
->>>>>>> 9ea4aaa24b42607a6bec7b09acb1680184a8a3c7
     h1h2_train, train_data = read_eigenvectors(training_fname)
     h1h2_test, test_data = read_eigenvectors(test_fname)
 
@@ -86,21 +77,17 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
 
     my_qcnn.add_layer(my_qcnn.Layers[legacy_fully_connected_layer.name], kwargs={})
 
-    ## Initialize parameters:
+    # Initialize parameters:
     my_qcnn.initialize_params(random=True)
     initial_params = copy.deepcopy(my_qcnn.params)
 
-    ## Learning as described in paper:
+    # Learning as described in paper:
     learning_rate = 100000  # intial value was 10 but this quantity doesn't learn fast enough !
     successive_loss = 1.0  # initialize to arbitrary value > 10^-5
     loss_lst = []  # initialize
     iteration_num = 1
 
-<<<<<<< HEAD
-    while (abs(successive_loss) > 1e-5) and (iteration_num < 200):
-=======
     while (abs(successive_loss) > 1e-5) and (iteration_num < 250):
->>>>>>> 9ea4aaa24b42607a6bec7b09acb1680184a8a3c7
         pred = my_qcnn.forward(train_data, my_qcnn.params.copy())
         loss = my_qcnn.mse_loss(pred, labels)
 
@@ -128,17 +115,16 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
     optimal_params = copy.deepcopy(my_qcnn.params)
     my_qcnn.export_params(my_qcnn.structure, my_qcnn.params, fname=f'./results/{unique_name}model.pkl')
 
-    ## Using model on test data (graph visualization) :
+    # Using model on test data (graph visualization) :
     predictions = my_qcnn.forward(test_data, my_qcnn.params.copy())
     pred_mat = predictions.reshape((64, 64), order='F')
     plot_heat_map(pred_mat, f'{unique_name}results_optimal_params.png')
-
 
     initial_predictions = my_qcnn.forward(test_data, initial_params)
     pred_mat = initial_predictions.reshape((64, 64), order='F')
     plot_heat_map(pred_mat, f'{unique_name}results_initial_params.png')
 
-    ## Loss plot:
+    # Loss plot:
     x_axis = range(len(loss_lst))
     plt.plot(x_axis, loss_lst)
     plt.title('Training Loss over Epoches')
@@ -156,6 +142,7 @@ def main():
 
         run_qcnn(num_qubits, unique_name, training_fname, test_fname)
         print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
+
 
 if __name__ == "__main__":
     main()
