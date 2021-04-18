@@ -1,5 +1,6 @@
-import copy
+import os
 import sys
+import copy
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt 
@@ -48,30 +49,33 @@ def plot_heat_map(pred_mat, fname_save, title="2-D Heat Map", save_path="./resul
     return
 
 
+<<<<<<< HEAD
 def main():
     num_qubits = 9
     training_fname = "./data/dataset_n=9_train.txt"
     test_fname = "./data/dataset_n=9_test.txt"
 
+=======
+def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
+>>>>>>> 9ea4aaa24b42607a6bec7b09acb1680184a8a3c7
     h1h2_train, train_data = read_eigenvectors(training_fname)
     h1h2_test, test_data = read_eigenvectors(test_fname)
 
     labels = np.zeros(40)
-
     for index, h1h2 in enumerate(h1h2_train):
+
         h1, h2 = h1h2
         if h1 <= 1:
             labels[index] = 1.0
 
-
-    ## Model -----------------------------------------------------------------------------------------------------------
+    # Model ------------------------------------------------------------------------
     my_qcnn = q.Qcnn(num_qubits)
 
-    ## Add Custom layer:
+    # Add Custom layer:
     legacy_fully_connected_layer = cl.get_legacy_fc_layer(num_qubits // 3)
     my_qcnn.Layers[legacy_fully_connected_layer.name] = legacy_fully_connected_layer
 
-    ## def structure:
+    # def structure:
     my_qcnn.add_layer(my_qcnn.Layers["legacy_conv4_layer"], kwargs={"label": "C4_1"})
     my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C2"})
     # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C3", "start_index": 1})
@@ -92,7 +96,11 @@ def main():
     loss_lst = []  # initialize
     iteration_num = 1
 
+<<<<<<< HEAD
     while (abs(successive_loss) > 1e-5) and (iteration_num < 200):
+=======
+    while (abs(successive_loss) > 1e-5) and (iteration_num < 250):
+>>>>>>> 9ea4aaa24b42607a6bec7b09acb1680184a8a3c7
         pred = my_qcnn.forward(train_data, my_qcnn.params.copy())
         loss = my_qcnn.mse_loss(pred, labels)
 
@@ -100,7 +108,6 @@ def main():
 
         if iteration_num == 1:
             pass
-
         else:
             successive_loss = loss - loss_lst[-1]
             if successive_loss < 0:
@@ -108,26 +115,28 @@ def main():
             else:
                 learning_rate /= 2  # if it gets bigger, decrease learning rate by 50%
 
-        grad_mat = my_qcnn.compute_grad(train_data, labels)
-        #     grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
+        # grad_mat = my_qcnn.compute_grad(train_data, labels)
+        grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
         my_qcnn.update_params(grad_mat, learning_rate)
 
         loss_lst.append(loss)
         iteration_num += 1
     # model end --------------------------------------------------------------------------------------------------------
 
+    os.mkdir("results/" + unique_name)
+
     optimal_params = copy.deepcopy(my_qcnn.params)
-    my_qcnn.export_params(my_qcnn.structure, my_qcnn.params, fname='./results/model.pkl')
+    my_qcnn.export_params(my_qcnn.structure, my_qcnn.params, fname=f'./results/{unique_name}model.pkl')
 
     ## Using model on test data (graph visualization) :
     predictions = my_qcnn.forward(test_data, my_qcnn.params.copy())
     pred_mat = predictions.reshape((64, 64), order='F')
-    plot_heat_map(pred_mat, 'results_optimal_params.png')
+    plot_heat_map(pred_mat, f'{unique_name}results_optimal_params.png')
 
 
     initial_predictions = my_qcnn.forward(test_data, initial_params)
     pred_mat = initial_predictions.reshape((64, 64), order='F')
-    plot_heat_map(pred_mat, 'results_initial_params.png')
+    plot_heat_map(pred_mat, f'{unique_name}results_initial_params.png')
 
     ## Loss plot:
     x_axis = range(len(loss_lst))
@@ -135,10 +144,18 @@ def main():
     plt.title('Training Loss over Epoches')
     plt.xlabel('Epoches')
     plt.ylabel("Loss")
-    plt.savefig("./results/loss.png")
-
+    plt.savefig(f"./results/{unique_name}loss.png")
     return
 
+
+def main():
+    for num_qubits in [9]:
+        training_fname = f"../data_gen/dataset_n={num_qubits}_train.txt"
+        test_fname = f"../data_gen/dataset_n={num_qubits}_test.txt"
+        unique_name = f"n{num_qubits}_250itterations_with_proper_train/"
+
+        run_qcnn(num_qubits, unique_name, training_fname, test_fname)
+        print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
 
 if __name__ == "__main__":
     main()
