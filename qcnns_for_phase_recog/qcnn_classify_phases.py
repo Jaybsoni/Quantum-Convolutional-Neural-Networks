@@ -48,6 +48,14 @@ def plot_heat_map(pred_mat, fname_save, title="2-D Heat Map", save_path="./resul
     return
 
 
+def save_lst(lst, file_name):
+    f = open(file_name, 'w')
+    for obj in lst:
+        f.write("{}\n".format(obj))
+    f.close()
+    return
+
+
 def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
     h1h2_train, train_data = read_eigenvectors(training_fname)
     h1h2_test, test_data = read_eigenvectors(test_fname)
@@ -60,17 +68,75 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
             labels[index] = 1.0
 
     # Model ------------------------------------------------------------------------
+    # my_qcnn = q.Qcnn(num_qubits)
+    #
+    # # Add Custom layer:
+    # legacy_fully_connected_layer = cl.get_legacy_fc_layer(num_qubits // 3)
+    # my_qcnn.Layers[legacy_fully_connected_layer.name] = legacy_fully_connected_layer
+    #
+    # # def structure:
+    # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv4_layer"], kwargs={"label": "C4_1"})
+    # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C2"})
+    # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C3", "start_index": 1})
+    # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C4", "start_index": 2})
+    # my_qcnn.add_layer(my_qcnn.Layers["legacy_pool_layer"], kwargs={"label": "P1",
+    #                                                                "update_active_qubits": {"group_len": 3,
+    #                                                                                         "target": 1}})
+    #
+    # my_qcnn.add_layer(my_qcnn.Layers[legacy_fully_connected_layer.name], kwargs={})
+    #
+    # # Initialize parameters:
+    # my_qcnn.initialize_params(random=True)
+    # initial_params = copy.deepcopy(my_qcnn.params)
+    #
+    # # Learning as described in paper:
+    # learning_rate = 100000  # intial value was 10 but this quantity doesn't learn fast enough !
+    # successive_loss = 1.0  # initialize to arbitrary value > 10^-5
+    # loss_lst = []  # initialize
+    # grad_mag_lst = [] # initialize
+    # iteration_num = 1
+    #
+    # while (abs(successive_loss) > 1e-5) and (iteration_num < 250):
+    #     pred = my_qcnn.forward(train_data, my_qcnn.params.copy())
+    #     loss = my_qcnn.mse_loss(pred, labels)
+    #
+    #     print("---- Iteration : {}, Loss {} ----------------------".format(iteration_num, loss))
+    #
+    #     if iteration_num == 1:
+    #         pass
+    #     else:
+    #         successive_loss = loss - loss_lst[-1]
+    #         if successive_loss < 0:
+    #             learning_rate *= 1.05  # if loss decreases, increase learning rate by 5%
+    #         else:
+    #             learning_rate /= 2  # if it gets bigger, decrease learning rate by 50%
+    #
+    #     # grad_mat = my_qcnn.compute_grad(train_data, labels)
+    #     grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
+    #     my_qcnn.update_params(grad_mat, learning_rate)
+    #
+    #     grad_mag = np.linalg.norm(grad_mat)
+    #
+    #     grad_mag_lst.append()
+    #     loss_lst.append(loss)
+    #     iteration_num += 1
+    # model end --------------------------------------------------------------------------------------------------------
+
+    # new model --------------------------------------------------------------------------------------------------------
     my_qcnn = q.Qcnn(num_qubits)
 
     # Add Custom layer:
     legacy_fully_connected_layer = cl.get_legacy_fc_layer(num_qubits // 3)
     my_qcnn.Layers[legacy_fully_connected_layer.name] = legacy_fully_connected_layer
 
+    custom_fully_connected_layer = cl.get_custom_conv_layer(3)
+    my_qcnn.Layers[custom_fully_connected_layer.name] = custom_fully_connected_layer
+
     # def structure:
     my_qcnn.add_layer(my_qcnn.Layers["legacy_conv4_layer"], kwargs={"label": "C4_1"})
-    my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C2"})
-    # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C3", "start_index": 1})
-    # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C4", "start_index": 2})
+    my_qcnn.add_layer(my_qcnn.Layers["custom_conv_layer_n3"], kwargs={})
+    my_qcnn.add_layer(my_qcnn.Layers["custom_conv_layer_n3"], kwargs={"start_index": 1})
+    my_qcnn.add_layer(my_qcnn.Layers["custom_conv_layer_n3"], kwargs={"start_index": 2})
     my_qcnn.add_layer(my_qcnn.Layers["legacy_pool_layer"], kwargs={"label": "P1",
                                                                    "update_active_qubits": {"group_len": 3,
                                                                                             "target": 1}})
@@ -85,6 +151,7 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
     learning_rate = 100000  # intial value was 10 but this quantity doesn't learn fast enough !
     successive_loss = 1.0  # initialize to arbitrary value > 10^-5
     loss_lst = []  # initialize
+    grad_mag_lst = []  # initialize
     iteration_num = 1
 
     while (abs(successive_loss) > 1e-5) and (iteration_num < 250):
@@ -106,6 +173,9 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
         grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
         my_qcnn.update_params(grad_mat, learning_rate)
 
+        grad_mag = np.linalg.norm(grad_mat)
+
+        grad_mag_lst.append()
         loss_lst.append(loss)
         iteration_num += 1
     # model end --------------------------------------------------------------------------------------------------------
@@ -113,7 +183,8 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
     os.mkdir("results/" + unique_name)
 
     optimal_params = copy.deepcopy(my_qcnn.params)
-    my_qcnn.export_params(my_qcnn.structure, my_qcnn.params, fname=f'./results/{unique_name}model.pkl')
+    my_qcnn.export_params(my_qcnn.structure, optimal_params, fname=f'./results/{unique_name}model_optimal.pkl')
+    my_qcnn.export_params(my_qcnn.structure, initial_params, fname=f'./results/{unique_name}model_initial.pkl')
 
     # Using model on test data (graph visualization) :
     predictions = my_qcnn.forward(test_data, my_qcnn.params.copy())
