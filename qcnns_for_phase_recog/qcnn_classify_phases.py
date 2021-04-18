@@ -49,9 +49,9 @@ def plot_heat_map(pred_mat, fname_save, title="2-D Heat Map", save_path="./resul
 
 
 def main():
-    num_qubits = 8
-    training_fname = "./data/dataset_n=8_train.txt"
-    test_fname = "./data/dataset_n=8_test.txt"
+    num_qubits = 9
+    training_fname = "./data/dataset_n=9_train.txt"
+    test_fname = "./data/dataset_n=9_test.txt"
 
     h1h2_train, train_data = read_eigenvectors(training_fname)
     h1h2_test, test_data = read_eigenvectors(test_fname)
@@ -74,8 +74,8 @@ def main():
     ## def structure:
     my_qcnn.add_layer(my_qcnn.Layers["legacy_conv4_layer"], kwargs={"label": "C4_1"})
     my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C2"})
-    my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C3", "start_index": 1})
-    my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C4", "start_index": 2})
+    # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C3", "start_index": 1})
+    # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C4", "start_index": 2})
     my_qcnn.add_layer(my_qcnn.Layers["legacy_pool_layer"], kwargs={"label": "P1",
                                                                    "update_active_qubits": {"group_len": 3,
                                                                                             "target": 1}})
@@ -92,7 +92,7 @@ def main():
     loss_lst = []  # initialize
     iteration_num = 1
 
-    while (abs(successive_loss) > 1e-5) and (iteration_num < 2):
+    while (abs(successive_loss) > 1e-5) and (iteration_num < 200):
         pred = my_qcnn.forward(train_data, my_qcnn.params.copy())
         loss = my_qcnn.mse_loss(pred, labels)
 
