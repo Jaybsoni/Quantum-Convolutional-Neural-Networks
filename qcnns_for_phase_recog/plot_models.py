@@ -129,7 +129,7 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname, model_num):
     loss_lst = []  # initialize
     iteration_num = 1
 
-    while (abs(successive_loss) > 1e-5) and (iteration_num < 2):
+    while (abs(successive_loss) > 1e-5) and (iteration_num < 3):
         pred = my_qcnn.forward(train_data, my_qcnn.params.copy())
         loss = my_qcnn.mse_loss(pred, labels)
 
@@ -152,7 +152,14 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname, model_num):
         iteration_num += 1
     # model end --------------------------------------------------------------------------------------------------------
 
-    os.mkdir("results/" + unique_name)
+    if (os.path.isdir("results/" + unique_name)):
+        # os.remove(f"./results/{unique_name}model.pkl")
+        pass
+
+    else:
+        os.mkdir("results/" + unique_name)
+
+    # os.mkdir("results/" + unique_name)
 
     optimal_params = copy.deepcopy(my_qcnn.params)
     my_qcnn.export_params(my_qcnn.structure, my_qcnn.params, fname=f'./results/{unique_name}model.pkl')
@@ -168,36 +175,75 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname, model_num):
     plot_heat_map(pred_mat, f'{unique_name}results_initial_params.png')
 
     ## Loss plot:
+    fig = plt.figure()
     x_axis = range(len(loss_lst))
     plt.plot(x_axis, loss_lst)
     plt.title('Training Loss over Epoches')
     plt.xlabel('Epoches')
     plt.ylabel("Loss")
-    plt.savefig(f"./results/{unique_name}loss.png")
+    fig.savefig(f"./results/{unique_name}loss.png")
+    plt.close(fig)
     return
 
 
 def main():
+    # for num_qubits in [9]:
+    #     training_fname = f"./data/dataset_n={num_qubits}_train.txt"
+    #     test_fname = f"./data/dataset_n={num_qubits}_test.txt"
+    #     # unique_name = f"n{num_qubits}_250itterations_with_proper_train/"
+    #     unique_name_0 = f"n{num_qubits}_50itterations_with_proper_train_0/"
+    #     unique_name_1 = f"n{num_qubits}_50itterations_with_proper_train_1/"
+    #     unique_name_2 = f"n{num_qubits}_50itterations_with_proper_train_2/"
+    #     unique_name_3 = f"n{num_qubits}_50itterations_with_proper_train_3/"
+
+    #     run_qcnn(num_qubits, unique_name_0, training_fname, test_fname, 0)
+    #     print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
+
+    #     run_qcnn(num_qubits, unique_name_1, training_fname, test_fname, 1)
+    #     print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
+
+    #     run_qcnn(num_qubits, unique_name_2, training_fname, test_fname, 2)
+    #     print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
+
+    #     run_qcnn(num_qubits, unique_name_3, training_fname, test_fname, 3)
+    #     print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
+
     for num_qubits in [9]:
         training_fname = f"./data/dataset_n={num_qubits}_train.txt"
         test_fname = f"./data/dataset_n={num_qubits}_test.txt"
         # unique_name = f"n{num_qubits}_250itterations_with_proper_train/"
-        unique_name_0 = f"n{num_qubits}_test0/"
-        unique_name_1 = f"n{num_qubits}_test1/"
-        unique_name_2 = f"n{num_qubits}_test2/"
-        unique_name_3 = f"n{num_qubits}_test3/"
+        unique_name_0 = f"n{num_qubits}_5itterations_with_proper_train_0/"
 
         run_qcnn(num_qubits, unique_name_0, training_fname, test_fname, 0)
         print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
 
+    for num_qubits in [9]:
+        training_fname = f"./data/dataset_n={num_qubits}_train.txt"
+        test_fname = f"./data/dataset_n={num_qubits}_test.txt"
+        # unique_name = f"n{num_qubits}_250itterations_with_proper_train/"
+        unique_name_1 = f"n{num_qubits}_5itterations_with_proper_train_1/"
+
         run_qcnn(num_qubits, unique_name_1, training_fname, test_fname, 1)
         print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
+
+    for num_qubits in [9]:
+        training_fname = f"./data/dataset_n={num_qubits}_train.txt"
+        test_fname = f"./data/dataset_n={num_qubits}_test.txt"
+        # unique_name = f"n{num_qubits}_250itterations_with_proper_train/"
+        unique_name_2 = f"n{num_qubits}_5itterations_with_proper_train_2/"
 
         run_qcnn(num_qubits, unique_name_2, training_fname, test_fname, 2)
         print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
 
+    for num_qubits in [9]:
+        training_fname = f"./data/dataset_n={num_qubits}_train.txt"
+        test_fname = f"./data/dataset_n={num_qubits}_test.txt"
+        # unique_name = f"n{num_qubits}_250itterations_with_proper_train/"
+        unique_name_3 = f"n{num_qubits}_5itterations_with_proper_train_3/"
+
         run_qcnn(num_qubits, unique_name_3, training_fname, test_fname, 3)
         print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
+
 
 if __name__ == "__main__":
     main()
