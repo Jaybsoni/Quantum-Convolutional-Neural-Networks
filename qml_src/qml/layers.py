@@ -54,6 +54,31 @@ def controlled_pool(mat):
     return np.kron(i_hat, identity) + np.kron(j_hat, mat)
 
 
+def generate_uniformly_controlled_rotation(circ, params, control_qubit_indicies,
+                                           target_qubit_index, axis='z', label=""):
+    num_control_qubits = len(control_qubit_indicies)
+
+    divisors = range(num_control_qubits - 1, -1, -1)   # starts from largest divisor to smallest
+    divisors = [2**i for i in divisors]
+
+    for iteration_num, theta in zip(range(1, 2**num_control_qubits + 1), params):
+        if axis == 'z':
+            circ.rz(theta, target_qubit_index)
+        elif axis == 'y':
+            circ.ry(theta, target_qubit_index)
+        else:
+            circ.rx(theta, target_qubit_index)
+
+        for divisor in divisors:
+            # print('iteration_num: {}, divisor: {}'.format(iteration_num, divisor))
+            if iteration_num % divisor == 0:
+                # print('----------')
+                control_element = int((num_control_qubits - 1) - np.log2(divisor))
+                circ.cx(control_qubit_indicies[control_element], target_qubit_index)
+                break
+    return
+
+
 # Layer Implement ################################################
 
 def legacy_conv4_layer_func(circ, params, active_qubits, barrier=True, kwargs={}):
@@ -213,6 +238,83 @@ def legacy_fc_layer_fun(circ, params, active_qubits, barrier=True, kwargs={}):
     return circ
 
 
+def custom_conv_layer_fun(circ, params, active_qubits, barrier=True, kwargs={}):
+    if "start_index" in kwargs:
+        index = kwargs["start_index"]
+    else:
+        index = 0
+
+    if "label" in kwargs:
+        label = kwargs["label"]
+    else:
+        label = 'cc'
+
+    if "group_size" in kwargs:
+        group_size = kwargs["group_size"]
+    else:
+        group_size = 3
+
+    while index + (group_size - 1) < len(active_qubits):
+        param_pointer = 0
+        lst_indicies = range(index, index + group_size)
+
+        # z,y ascending loop
+        for axis in ['z', 'y']:
+            split_index = group_size - 1
+            while split_index > 0:
+                control_indicies = lst_indicies[:split_index]
+                control_qubit_indicies = [active_qubits[i] for i in control_indicies]
+                target_qubit_index = active_qubits[lst_indicies[split_index]]
+
+                num_local_params = 2**(len(control_qubit_indicies))
+                local_params = params[param_pointer:param_pointer + num_local_params]
+                param_pointer += num_local_params
+
+                generate_uniformly_controlled_rotation(circ, local_params, control_qubit_indicies,
+                                                       target_qubit_index, axis=axis, label=label)
+
+                split_index -= 1
+
+            if axis == 'z':
+                circ.rz(params[param_pointer], active_qubits[lst_indicies[split_index]])
+            else:
+                circ.ry(params[param_pointer], active_qubits[lst_indicies[split_index]])
+            param_pointer += 1
+
+        # descending loop
+        for axis in ['y', 'z']:
+            split_index = 1
+
+            if axis == 'z':
+                circ.rz(params[param_pointer], active_qubits[lst_indicies[split_index-1]])
+                param_pointer += 1
+
+            while split_index < group_size:
+                control_indicies = lst_indicies[:split_index]
+                control_qubit_indicies = [active_qubits[i] for i in control_indicies]
+                target_qubit_index = active_qubits[lst_indicies[split_index]]
+
+                num_local_params = 2**(len(control_qubit_indicies))
+                local_params = params[param_pointer:param_pointer + num_local_params]
+                param_pointer += num_local_params
+
+                generate_uniformly_controlled_rotation(circ, local_params, control_qubit_indicies,
+                                                       target_qubit_index, axis=axis, label=label)
+
+                split_index += 1
+
+        index += group_size
+
+    if barrier:
+        circ.barrier()
+
+    return
+
+
+def custom_pool_layer_fun(circ, params, active_qubits, barrier=True, kwargs={}):
+    return
+
+
 # Layer class ######################################################################
 class Layer:
 
@@ -227,13 +329,29 @@ class Layer:
         return inst
 
 
-# ugly temp function because im not sure how to make this cleaner right now
+# Temp functions to get customizable layers, im not sure how to make this cleaner right now ##########################
 def get_legacy_fc_layer(num_active_qubits):
     layer_name = "legacy_fc_layer_n{}".format(num_active_qubits)
     fc_layer = Layer(layer_name, legacy_fc_layer_fun, (2**num_active_qubits - 1,))
     return fc_layer
 
 
+def get_custom_conv_layer(group_size):
+    num_params = 0
+    for q in range(group_size):
+        num_params += 2 ** q
+    num_params = (num_params * 2 - 1) * 2 + 1
+
+    layer_name = "custom_conv_layer_n{}".format(group_size)
+    cc_layer = Layer(layer_name, custom_conv_layer_fun, (num_params,))
+    return cc_layer
+
+
+def get_custom_pool_layer(num_active_qubits):
+    return
+
+
+# Base Legacy Layers #################################################################################################
 legacy_conv4_layer = Layer("legacy_conv4_layer", legacy_conv4_layer_func, (15,))
 legacy_conv_layer = Layer("legacy_conv_layer", legacy_conv_layer_func, (63,))
 legacy_pool_layer = Layer("legacy_pool_layer", legacy_pool_layer_func, (6,))
