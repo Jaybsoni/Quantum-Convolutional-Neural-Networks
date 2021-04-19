@@ -254,13 +254,8 @@ class Hamiltonian:
             if name == "train": h2 = 0  # If in training mode, h2 should be 0!
 
             h = self.first_term + (self.second_term * h1) + (self.third_term * h2)
-
-            if h1 == 0:
-                # Used for h1 == 0 due to eigenvector degeneracy
-                eigenvalue, eigenvector = self.find_eigval_with_np(h)  # Slower method with np
-            else:
-                eigenvalue, eigenvector = self.find_eigval_with_sparse(h)
-                # self.test_dataset(h, eigenvalue)  # SLOW! Compares np.eig with sparse.eig
+            eigenvalue, eigenvector = self.find_eigval_with_sparse(h)
+            # self.test_dataset(h, eigenvalue)  # SLOW! Compares np.eig with sparse.eig
 
             # Write to file each time to avoid saving to ram
             with open(filename, 'a+') as f:
@@ -331,7 +326,7 @@ X.setdiag(np.ones(1), 1)
 
 if __name__ == '__main__':
     s = time.time()
-    n = 9
+    n = 12
 
     H = Hamiltonian(n)
     H.generate_data(40, 1, "train")

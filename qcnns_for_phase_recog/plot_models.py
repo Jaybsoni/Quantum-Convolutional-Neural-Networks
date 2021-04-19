@@ -144,8 +144,8 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname, model_num):
             else:
                 learning_rate /= 2  # if it gets bigger, decrease learning rate by 50%
 
-        grad_mat = my_qcnn.compute_grad(train_data, labels)
-        # grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
+        # grad_mat = my_qcnn.compute_grad(train_data, labels)
+        grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
         my_qcnn.update_params(grad_mat, learning_rate)
 
         loss_lst.append(loss)
@@ -187,61 +187,17 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname, model_num):
 
 
 def main():
-    # for num_qubits in [9]:
-    #     training_fname = f"./data/dataset_n={num_qubits}_train.txt"
-    #     test_fname = f"./data/dataset_n={num_qubits}_test.txt"
-    #     # unique_name = f"n{num_qubits}_250itterations_with_proper_train/"
-    #     unique_name_0 = f"n{num_qubits}_50itterations_with_proper_train_0/"
-    #     unique_name_1 = f"n{num_qubits}_50itterations_with_proper_train_1/"
-    #     unique_name_2 = f"n{num_qubits}_50itterations_with_proper_train_2/"
-    #     unique_name_3 = f"n{num_qubits}_50itterations_with_proper_train_3/"
 
-    #     run_qcnn(num_qubits, unique_name_0, training_fname, test_fname, 0)
-    #     print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
+    num_qubits = 9
+    runs = ["originalLayers", "oneExtraLayer", "oneLessLayer", "twoLessLayers"]
 
-    #     run_qcnn(num_qubits, unique_name_1, training_fname, test_fname, 1)
-    #     print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
+    for elem, val in enumerate(runs):
+        print(elem, val)
+        training_fname = f"../data_gen/dataset_n={num_qubits}_train.txt"
+        test_fname = f"../data_gen/dataset_n={num_qubits}_test.txt"
+        unique_name = f"n{num_qubits}_50itterations_{val}/"
 
-    #     run_qcnn(num_qubits, unique_name_2, training_fname, test_fname, 2)
-    #     print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
-
-    #     run_qcnn(num_qubits, unique_name_3, training_fname, test_fname, 3)
-    #     print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
-
-    for num_qubits in [9]:
-        training_fname = f"./data/dataset_n={num_qubits}_train.txt"
-        test_fname = f"./data/dataset_n={num_qubits}_test.txt"
-        # unique_name = f"n{num_qubits}_250itterations_with_proper_train/"
-        unique_name_0 = f"n{num_qubits}_50itterations_with_proper_train_0/"
-
-        run_qcnn(num_qubits, unique_name_0, training_fname, test_fname, 0)
-        print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
-
-    for num_qubits in [9]:
-        training_fname = f"./data/dataset_n={num_qubits}_train.txt"
-        test_fname = f"./data/dataset_n={num_qubits}_test.txt"
-        # unique_name = f"n{num_qubits}_250itterations_with_proper_train/"
-        unique_name_1 = f"n{num_qubits}_50itterations_with_proper_train_1/"
-
-        run_qcnn(num_qubits, unique_name_1, training_fname, test_fname, 1)
-        print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
-
-    for num_qubits in [9]:
-        training_fname = f"./data/dataset_n={num_qubits}_train.txt"
-        test_fname = f"./data/dataset_n={num_qubits}_test.txt"
-        # unique_name = f"n{num_qubits}_250itterations_with_proper_train/"
-        unique_name_2 = f"n{num_qubits}_50itterations_with_proper_train_2/"
-
-        run_qcnn(num_qubits, unique_name_2, training_fname, test_fname, 2)
-        print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
-
-    for num_qubits in [9]:
-        training_fname = f"./data/dataset_n={num_qubits}_train.txt"
-        test_fname = f"./data/dataset_n={num_qubits}_test.txt"
-        # unique_name = f"n{num_qubits}_250itterations_with_proper_train/"
-        unique_name_3 = f"n{num_qubits}_50itterations_with_proper_train_3/"
-
-        run_qcnn(num_qubits, unique_name_3, training_fname, test_fname, 3)
+        run_qcnn(num_qubits, unique_name, training_fname, test_fname, elem)
         print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
 
 
