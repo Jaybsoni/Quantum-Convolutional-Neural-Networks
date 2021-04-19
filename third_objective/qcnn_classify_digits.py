@@ -44,9 +44,9 @@ def run_qcnn(train_data, labels, my_qcnn, unique_name):
     if os.path.isfile(acc_file): os.remove(acc_file)
     if os.path.isfile(param_file): os.remove(param_file)
 
-    batch_size = 100
-    num_batches = len(train_data) // batch_size
-    num_epoches = 250
+    batch_size = 50
+    num_batches = 10 #len(train_data) // batch_size
+    num_epoches = 200
     loss_lst = []  # initialize
     acc_lst = []
 
