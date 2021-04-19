@@ -46,7 +46,7 @@ def run_qcnn(train_data, labels, my_qcnn, unique_name):
 
     batch_size = 50
     num_batches = 10 #len(train_data) // batch_size
-    num_epoches = 200
+    num_epoches = 100
     loss_lst = []  # initialize
     acc_lst = []
 
