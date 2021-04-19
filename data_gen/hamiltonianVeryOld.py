@@ -89,7 +89,7 @@ class HamiltonianVeryOld:
         self.third_term = np.zeros(shape=(self.size, self.size), dtype=float)
         print(self.first_term.shape)
         # Delete the output file if exists so we can append to a fresh one.
-        self.filename = f'dataset_n={n}.txt'
+        self.filename = f'VOLD_dataset_n={n}.txt'
         if os.path.isfile(self.filename):
             os.remove(self.filename)
 
@@ -161,3 +161,6 @@ class HamiltonianVeryOld:
 
         print(f"added all terms in {time.time() - s} seconds")
         return
+
+H = HamiltonianVeryOld(9)
+H.calculate_hamiltonian()

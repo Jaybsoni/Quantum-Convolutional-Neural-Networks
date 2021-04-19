@@ -331,10 +331,10 @@ X.setdiag(np.ones(1), 1)
 
 if __name__ == '__main__':
     s = time.time()
-    n = 8
+    n = 9
 
     H = Hamiltonian(n)
-    H.generate_data(40, 1, "train")
+    # H.generate_data(40, 1, "train")
     H.generate_data(64, 64, "test")
     print(H.third_term)
     print(f"Time for creating dataset was {time.time() - s} seconds")
