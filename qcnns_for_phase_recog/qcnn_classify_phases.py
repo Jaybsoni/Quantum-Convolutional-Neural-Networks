@@ -56,7 +56,7 @@ def save_lst(lst, file_name):
     return
 
 
-def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
+def extract_data(training_fname, test_fname):
     h1h2_train, train_data = read_eigenvectors(training_fname)
     h1h2_test, test_data = read_eigenvectors(test_fname)
 
@@ -67,62 +67,33 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
         if h1 <= 1:
             labels[index] = 1.0
 
-    # Model ------------------------------------------------------------------------
-    # my_qcnn = q.Qcnn(num_qubits)
-    #
-    # # Add Custom layer:
-    # legacy_fully_connected_layer = cl.get_legacy_fc_layer(num_qubits // 3)
-    # my_qcnn.Layers[legacy_fully_connected_layer.name] = legacy_fully_connected_layer
-    #
-    # # def structure:
-    # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv4_layer"], kwargs={"label": "C4_1"})
-    # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C2"})
-    # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C3", "start_index": 1})
-    # my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C4", "start_index": 2})
-    # my_qcnn.add_layer(my_qcnn.Layers["legacy_pool_layer"], kwargs={"label": "P1",
-    #                                                                "update_active_qubits": {"group_len": 3,
-    #                                                                                         "target": 1}})
-    #
-    # my_qcnn.add_layer(my_qcnn.Layers[legacy_fully_connected_layer.name], kwargs={})
-    #
-    # # Initialize parameters:
-    # my_qcnn.initialize_params(random=True)
-    # initial_params = copy.deepcopy(my_qcnn.params)
-    #
-    # # Learning as described in paper:
-    # learning_rate = 100000  # intial value was 10 but this quantity doesn't learn fast enough !
-    # successive_loss = 1.0  # initialize to arbitrary value > 10^-5
-    # loss_lst = []  # initialize
-    # grad_mag_lst = [] # initialize
-    # iteration_num = 1
-    #
-    # while (abs(successive_loss) > 1e-5) and (iteration_num < 250):
-    #     pred = my_qcnn.forward(train_data, my_qcnn.params.copy())
-    #     loss = my_qcnn.mse_loss(pred, labels)
-    #
-    #     print("---- Iteration : {}, Loss {} ----------------------".format(iteration_num, loss))
-    #
-    #     if iteration_num == 1:
-    #         pass
-    #     else:
-    #         successive_loss = loss - loss_lst[-1]
-    #         if successive_loss < 0:
-    #             learning_rate *= 1.05  # if loss decreases, increase learning rate by 5%
-    #         else:
-    #             learning_rate /= 2  # if it gets bigger, decrease learning rate by 50%
-    #
-    #     # grad_mat = my_qcnn.compute_grad(train_data, labels)
-    #     grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
-    #     my_qcnn.update_params(grad_mat, learning_rate)
-    #
-    #     grad_mag = np.linalg.norm(grad_mat)
-    #
-    #     grad_mag_lst.append()
-    #     loss_lst.append(loss)
-    #     iteration_num += 1
-    # model end --------------------------------------------------------------------------------------------------------
+    return h1h2_train, train_data, h1h2_test, test_data, labels
 
-    # new model --------------------------------------------------------------------------------------------------------
+def instanciate_original_model(num_qubits):
+    my_qcnn = q.Qcnn(num_qubits)
+
+    # Add Custom layer:
+    legacy_fully_connected_layer = cl.get_legacy_fc_layer(num_qubits // 3)
+    my_qcnn.Layers[legacy_fully_connected_layer.name] = legacy_fully_connected_layer
+
+    # def structure:
+    my_qcnn.add_layer(my_qcnn.Layers["legacy_conv4_layer"], kwargs={"label": "C4_1"})
+    my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C2"})
+    my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C3", "start_index": 1})
+    my_qcnn.add_layer(my_qcnn.Layers["legacy_conv_layer"], kwargs={"label": "C4", "start_index": 2})
+    my_qcnn.add_layer(my_qcnn.Layers["legacy_pool_layer"], kwargs={"label": "P1",
+                                                                   "update_active_qubits": {"group_len": 3,
+                                                                                            "target": 1}})
+
+    my_qcnn.add_layer(my_qcnn.Layers[legacy_fully_connected_layer.name], kwargs={})
+
+    # Initialize parameters:
+    my_qcnn.initialize_params(random=False)
+    initial_params = copy.deepcopy(my_qcnn.params)
+    return my_qcnn, initial_params
+
+
+def instanciate_new_model(num_qubits):
     my_qcnn = q.Qcnn(num_qubits)
 
     # Add Custom layer:
@@ -140,21 +111,24 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
     my_qcnn.add_layer(my_qcnn.Layers["legacy_pool_layer"], kwargs={"label": "P1",
                                                                    "update_active_qubits": {"group_len": 3,
                                                                                             "target": 1}})
-
     my_qcnn.add_layer(my_qcnn.Layers[legacy_fully_connected_layer.name], kwargs={})
 
     # Initialize parameters:
-    my_qcnn.initialize_params(random=True)
+    my_qcnn.initialize_params(random=False)
     initial_params = copy.deepcopy(my_qcnn.params)
+
+    return my_qcnn, initial_params
+
+def run_qcnn(unique_name, packaged_datasets, my_qcnn, initial_params):
+    h1h2_train, train_data, h1h2_test, test_data, labels = packaged_datasets
 
     # Learning as described in paper:
     learning_rate = 100000  # intial value was 10 but this quantity doesn't learn fast enough !
     successive_loss = 1.0  # initialize to arbitrary value > 10^-5
     loss_lst = []  # initialize
-    grad_mag_lst = []  # initialize
     iteration_num = 1
 
-    while (abs(successive_loss) > 1e-5) and (iteration_num < 250):
+    while (abs(successive_loss) > 1e-5) and (iteration_num < itterations):
         pred = my_qcnn.forward(train_data, my_qcnn.params.copy())
         loss = my_qcnn.mse_loss(pred, labels)
 
@@ -173,9 +147,6 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
         grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
         my_qcnn.update_params(grad_mat, learning_rate)
 
-        grad_mag = np.linalg.norm(grad_mat)
-
-        grad_mag_lst.append()
         loss_lst.append(loss)
         iteration_num += 1
     # model end --------------------------------------------------------------------------------------------------------
@@ -196,24 +167,37 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname):
     plot_heat_map(pred_mat, f'{unique_name}results_initial_params.png')
 
     # Loss plot:
+    save_lst(loss_lst, f"./results/{unique_name}_lossList.txt")
     x_axis = range(len(loss_lst))
     plt.plot(x_axis, loss_lst)
     plt.title('Training Loss over Epoches')
     plt.xlabel('Epoches')
     plt.ylabel("Loss")
     plt.savefig(f"./results/{unique_name}loss.png")
+    plt.close()
     return
 
 
 def main():
-    for num_qubits in [9]:
-        training_fname = f"../data_gen/dataset_n={num_qubits}_train.txt"
-        test_fname = f"../data_gen/dataset_n={num_qubits}_test.txt"
-        unique_name = f"n{num_qubits}_250itterations_with_proper_train/"
+    num_qubits = 9
 
-        run_qcnn(num_qubits, unique_name, training_fname, test_fname)
-        print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
+    training_fname = f"../data_gen/dataset_n={num_qubits}_train.txt"
+    test_fname = f"../data_gen/dataset_n={num_qubits}_test.txt"
+    packaged_datasets = extract_data(training_fname, test_fname)
+
+    original_model, original_model_initial_params = instanciate_original_model(num_qubits)
+    new_model, new_model_initial_params = instanciate_new_model(num_qubits)
+
+    import time
+    t0 = time.time()
+    run_qcnn(f"n{num_qubits}_TEST_5_ITTERS_Original/", packaged_datasets, original_model, original_model_initial_params)
+    print(time.time() - t0)
+
+    t0 = time.time()
+    run_qcnn(f"n{num_qubits}_TEST_5_ITTERS_New/", packaged_datasets, new_model, new_model_initial_params)
+    print(time.time() - t0)
 
 
 if __name__ == "__main__":
+    itterations = 1200
     main()
