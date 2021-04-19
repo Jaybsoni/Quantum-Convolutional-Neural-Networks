@@ -7,7 +7,7 @@ class TetrisData():
         # Create general shapes of tetris blocks
         self.line = np.array([[1], [1], [1]])
         self.cw = np.array([[1, 1],
-                       [1, 0]])
+                            [1, 0]])
 
         # Create canvas array
         self.dim = dimension
@@ -20,7 +20,18 @@ class TetrisData():
 
     # Comment
     def add_array_to_grid(self, shape, shape_list, i, j):
-        grid = copy.deepcopy(self.grid)
+        """
+        Given a shape 'shape', and index points i, j; add_array_to_grid tried to overlay
+        shape to a copy of self.grid to see if it will fit. If it does, it will add it to
+        grid and then append the result to shape_list, a list of unique locations
+        that shape has fit in the grid size.
+        :param shape: tuple - shape of matrix
+        :param shape_list: list - list to append values to
+        :param i: int - i element of grid shape is being added to
+        :param j: int - j element of grid shape is being added to
+        :return:
+        """
+        grid = copy.deepcopy(self.grid)  # Necessary to do a deep copy!
 
         try:  # Find the shape of the object to know how much to shift when inserting into grid
             i_shift, j_shift = shape.shape
@@ -38,6 +49,10 @@ class TetrisData():
                 shape_list.append(grid)  # Append to list of combinations
 
     def generate_combinations_of_tetris_blocks(self):
+        """
+        Itterates through all the I and L combinations and their rotations and calls
+        add_array_to_grid to them.
+        """
         self.rotations_list, self.lines_list = [], []
 
         # Find all combinations of cw and line shape in the canvas (grid)
@@ -53,16 +68,31 @@ class TetrisData():
 
     @staticmethod
     def split_data(list_in, train, validate, test):
-        assert train + validate + test == 1
-        random.shuffle(list_in)
+        """
+        Given a list of values, randomize the list in groups that roughly match
+        the ratios of train, validate, and test
+        :param list_in:
+        :param train: float - value between 0 and 1
+        :param validate: float - value between 0 and 1
+        :param test: float - value between 0 and 1
+        :return: 3 x list of vals - properly sizes lists
+        """
+        assert train + validate + test == 1  # Ratio should equal 1
+        random.shuffle(list_in) # Randomized input list to help training set
 
-        bound1, bound2 = int(np.ceil(len(list_in) * train)), \
-                         int(np.ceil(len(list_in) * (train + validate)))
+        # Calculate the bounds for the data split step
+        bound1 = int(np.ceil(len(list_in) * train))
+        bound2 = int(np.ceil(len(list_in) * (train + validate)))
 
+        # Split the list into respectively sized lists
         d_train, d_val, d_test = list_in[: bound1], list_in[bound1:bound2], list_in[bound2:]
         return d_train, d_val, d_test
 
     def package_data(self):
+        """
+        Takes self.lines_list and self.rotations_list and does the necessary transformations
+        to make them the correct dimensions and types for training.
+        """
         # Separate lines_list and rotations_list into training, validation, and testing sets
         lines_train, lines_validate, lines_test = self.split_data(self.lines_list, 0.5, 0.3, 0.2)
         rots_train, rots_validate, rots_test = self.split_data(self.rotations_list, 0.5, 0.3, 0.2)
