@@ -1,5 +1,5 @@
 {
-	"learning_rate": 4e-3,
-	"num_epochs": 3e2,
-	"display_epochs": 1e1
+	"learning_rate": 1e-2,
+	"num_epochs": 1e4,
+	"display_epochs": 1e2
 }
