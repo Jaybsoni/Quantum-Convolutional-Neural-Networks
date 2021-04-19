@@ -29,12 +29,17 @@ def run_qcnn(train_data, labels, my_qcnn, unique_name):
     my_qcnn.initialize_params(random=True)
     initial_params = copy.deepcopy(my_qcnn.params)
 
+
+    # Create backup files
+    loss_file = f"/results/{unique_name}/Loss.txt"
+
     batch_size = 100
     num_batches = len(train_data) // batch_size
-    num_epoches = 250
+    num_epoches = 5
     loss_lst = []  # initialize
 
-    for batch_index in range(1, num_batches+1):
+    for batch_index in range(1, 3):
+    # for batch_index in range(1, num_batches + 1):
         batched_data = train_data[(batch_index - 1)*batch_size: batch_index*batch_size]
         batched_labels = labels[(batch_index - 1)*batch_size: batch_index*batch_size]
         learning_rate = 100000  # intial value was 10 but this quantity doesn't learn fast enough !
@@ -50,11 +55,15 @@ def run_qcnn(train_data, labels, my_qcnn, unique_name):
                 else:
                     learning_rate /= 2  # if it gets bigger, decrease learning rate by 50%
 
-            grad_mat = my_qcnn.compute_grad(train_data, labels)
-            # grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
+            # grad_mat = my_qcnn.compute_grad(train_data, labels)
+            grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
             my_qcnn.update_params(grad_mat, learning_rate)
 
             loss_lst.append(loss)
+            # Write to file each time to avoid saving to ram
+            with open(loss_file, 'a+') as f:
+                f.write(str(loss) + "\n")
+
     # model end --------------------------------------------------------------------------------------------------------
 
     if not os.path.isdir("results/" + unique_name):
