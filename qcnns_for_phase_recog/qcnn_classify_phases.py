@@ -122,6 +122,7 @@ def instanciate_new_model(num_qubits):
 def run_qcnn(unique_name, packaged_datasets, my_qcnn, initial_params):
     h1h2_train, train_data, h1h2_test, test_data, labels = packaged_datasets
 
+    print(f"Starting {unique_name}, with {itterations} itterations.")
     # Learning as described in paper:
     learning_rate = 100000  # intial value was 10 but this quantity doesn't learn fast enough !
     successive_loss = 1.0  # initialize to arbitrary value > 10^-5
