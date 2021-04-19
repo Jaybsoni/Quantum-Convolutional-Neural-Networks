@@ -7,16 +7,21 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, "../qml_src/")
 from qml import qcnn as q
 from qml import layers as cl  # custom layers
+from scraper import Data
 
 
-def get_wfs_from_images(num_qubits):
-    x = num_qubits
-    wf_train = []
-    wf_test = []
-    labels_train = []
-    labels_test = []
+def get_wfs_from_images():
+    data = Data()
 
-    return wf_train, wf_test, labels_train, labels_test
+    wfs_train = [vect / np.linalg.norm(vect) for vect in data.x_train]
+    wfs_test = [vect / np.linalg.norm(vect) for vect in data.x_test]
+
+    padding = np.zeros(256 - 196)
+
+    wfs_train = [np.append(wf, padding) for wf in wfs_train]
+    wfs_test = [np.append(wf, padding) for wf in wfs_test]
+
+    return wfs_train, wfs_test, data.y_train, data.y_test
 
 
 def run_qcnn(train_data, labels, my_qcnn, unique_name):
@@ -139,13 +144,16 @@ def main():
     num_qubits = 8
     unique_name = f"n{num_qubits}_digit_qcnn_train/"
 
-    wavefuncs_train, wavefuncs_test, labels_train, labels_test = get_wfs_from_images(num_qubits)
+    wavefuncs_train, wavefuncs_test, labels_train, labels_test = get_wfs_from_images()
+
+    wavefuncs_train_subset = wavefuncs_train[:5000]
+    labels_train_subset = labels_train[:5000]
 
     og_qcnn = og_model(num_qubits)
     # new_qcnn = new_model(num_qubits)
 
-    trained_og_qcnn = run_qcnn(wavefuncs_train, labels_train, og_qcnn, "og_" + unique_name)
-    # trained_new_qcnn = run_qcnn(wavefuncs_train, labels_train, new_qcnn, "new" + unique_name)
+    trained_og_qcnn = run_qcnn(wavefuncs_train_subset, labels_train_subset, og_qcnn, "og_" + unique_name)
+    # trained_new_qcnn = run_qcnn(wavefuncs_train_subset, labels_train_subset, new_qcnn, "new" + unique_name)
 
     mse_loss, acc, pred = test_qcnn(wavefuncs_test, labels_test, trained_og_qcnn, "og_" + unique_name)
     # mse_loss, acc, pred = test_qcnn(wavefuncs_test, labels_test, trained_new_qcnn)
