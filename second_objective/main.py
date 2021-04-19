@@ -60,7 +60,7 @@ def train_model(param, model, data):
 
 if __name__ == '__main__':
     start_time = time.time()
-    v = 1
+    v = 2
     filename = "temp"
 
     # Hyperparameters from json file are loaded
@@ -99,10 +99,10 @@ if __name__ == '__main__':
 
     plot_results(obj_vals, cross_vals, filename)
 
-    # Print final loss/acceptances
-    if v:
-        t = time.time() - start_time
-        correct, total = model.accuracy(data.x_test, data.y_test)
-        print("\nAfter training, we find the model has a test loss of {:.3f} ".format(cross_vals[-1]) +
-              "and an accuracy of {}/{}, or {:.3f}%\n".format(correct, total, (correct/total) * 100) +
-              "This was completed in {} minutes and {:.2f} seconds".format(math.floor(t / 60), t % 60))
+    # # Print final loss/acceptances
+    # if v:
+    #     t = time.time() - start_time
+    #     correct, total = model.accuracy(data.x_test, data.y_test)
+    #     print("\nAfter training, we find the model has a test loss of {:.3f} ".format(cross_vals[-1]) +
+    #           "and an accuracy of {}/{}, or {:.3f}%\n".format(correct, total, (correct/total) * 100) +
+    #           "This was completed in {} minutes and {:.2f} seconds".format(math.floor(t / 60), t % 60))
