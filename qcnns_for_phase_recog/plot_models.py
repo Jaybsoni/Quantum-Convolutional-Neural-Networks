@@ -129,7 +129,7 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname, model_num):
     loss_lst = []  # initialize
     iteration_num = 1
 
-    while (abs(successive_loss) > 1e-5) and (iteration_num < 3):
+    while (abs(successive_loss) > 1e-5) and (iteration_num < 50):
         pred = my_qcnn.forward(train_data, my_qcnn.params.copy())
         loss = my_qcnn.mse_loss(pred, labels)
 
@@ -144,8 +144,8 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname, model_num):
             else:
                 learning_rate /= 2  # if it gets bigger, decrease learning rate by 50%
 
-        grad_mat = my_qcnn.compute_grad(train_data, labels)
-        # grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
+        # grad_mat = my_qcnn.compute_grad(train_data, labels)
+        grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
         my_qcnn.update_params(grad_mat, learning_rate)
 
         loss_lst.append(loss)
@@ -192,8 +192,8 @@ def main():
 
     for elem, val in enumerate(runs):
         print(elem, val)
-        training_fname = f"./data/dataset_n={num_qubits}_train.txt"
-        test_fname = f"./data/dataset_n={num_qubits}_test.txt"
+        training_fname = f"../data_gen/dataset_n={num_qubits}_train.txt"
+        test_fname = f"../data_gen/dataset_n={num_qubits}_test.txt"
         unique_name = f"n{num_qubits}_50itterations_{val}/"
 
         run_qcnn(num_qubits, unique_name, training_fname, test_fname, elem)
