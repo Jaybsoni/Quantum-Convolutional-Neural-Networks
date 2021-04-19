@@ -21,7 +21,10 @@ def get_wfs_from_images():
     wfs_train = [np.append(wf, padding) for wf in wfs_train]
     wfs_test = [np.append(wf, padding) for wf in wfs_test]
 
-    return wfs_train, wfs_test, data.y_train, data.y_test
+    label_train = [int(i == 4) for i in data.y_train]
+    label_test = [int(i == 4) for i in data.y_test]
+
+    return wfs_train, wfs_test, label_train, label_test
 
 
 def run_qcnn(train_data, labels, my_qcnn, unique_name):
@@ -32,17 +35,20 @@ def run_qcnn(train_data, labels, my_qcnn, unique_name):
 
     # Create backup files
     loss_file = f"/results/{unique_name}/Loss.txt"
+    acc_file = f"/results/{unique_name}/TrainingAccuracy.txt"
 
     batch_size = 100
     num_batches = len(train_data) // batch_size
     num_epoches = 5
     loss_lst = []  # initialize
+    acc_lst = []
 
     for batch_index in range(1, 3):
     # for batch_index in range(1, num_batches + 1):
         batched_data = train_data[(batch_index - 1)*batch_size: batch_index*batch_size]
         batched_labels = labels[(batch_index - 1)*batch_size: batch_index*batch_size]
         learning_rate = 100000  # intial value was 10 but this quantity doesn't learn fast enough !
+        accuracy = 0
 
         for epoch in range(1, num_epoches + 1):
             pred = my_qcnn.forward(batched_data, my_qcnn.params.copy())
@@ -64,6 +70,13 @@ def run_qcnn(train_data, labels, my_qcnn, unique_name):
             with open(loss_file, 'a+') as f:
                 f.write(str(loss) + "\n")
 
+        for prediction, label in zip(pred, batched_labels):
+            if np.round(prediction) == float(label):
+                accuracy += 1
+        acc_lst.append(accuracy / batch_size)
+        with open(loss_file, 'a+') as f:
+            f.write(str(loss) + "\n")
+
     # model end --------------------------------------------------------------------------------------------------------
 
     if not os.path.isdir("results/" + unique_name):
@@ -80,6 +93,16 @@ def run_qcnn(train_data, labels, my_qcnn, unique_name):
     plt.xlabel('Epoches')
     plt.ylabel("Loss")
     plt.savefig(f"./results/{unique_name}loss.png")
+    plt.close()
+
+    # Accuracy plot:
+    x_axis = range(len(acc_lst))
+    plt.plot(x_axis, acc_lst)
+    plt.title('Training Accuracy over Batches')
+    plt.xlabel('Batches')
+    plt.ylabel("Accuracy")
+    plt.savefig(f"./results/{unique_name}acc.png")
+    plt.close()
 
     return my_qcnn
 
