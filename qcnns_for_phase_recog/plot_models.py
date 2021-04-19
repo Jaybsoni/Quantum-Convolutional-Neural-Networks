@@ -187,6 +187,7 @@ def run_qcnn(num_qubits, unique_name, training_fname, test_fname, model_num):
 
 
 def main():
+
     num_qubits = 9
     runs = ["originalLayers", "oneExtraLayer", "oneLessLayer", "twoLessLayers"]
 
@@ -198,7 +199,6 @@ def main():
 
         run_qcnn(num_qubits, unique_name, training_fname, test_fname, elem)
         print(f"* * * * * * * * * * * * * * *Finished {num_qubits}, qbits! * * * * * * * * * * * * * * *")
-
 
 
 if __name__ == "__main__":
