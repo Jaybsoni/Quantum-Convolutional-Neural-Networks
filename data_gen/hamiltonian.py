@@ -28,6 +28,13 @@ def read_eigenvectors(file):
 
 
 def find_kron(array, index, q_bits):
+    """
+
+    :param array: sparse.dia_matrix - Tensor (X or Z)
+    :param index: int - location of X or Z in identities
+    :param q_bits: int - number of qbits
+    :return:
+    """
     order = np.ones(q_bits)
     order[index-1] = 0  # Sets index as 0 to represent the array parameter given
     assert index <= q_bits  # n elements should always be larger than index for array
@@ -113,8 +120,6 @@ class Hamiltonian:
             resultant 4x4 matrix is at the locations of the rows of the first matrix 
             with the column of the second matrix that has a 1 populated at the rowID 
             that is the column of the 1 on the first matrix. Yeah. Hard to explain. 
-            Please see the attached photo in this directory named  _______________ 
-            to show an example!
             """
             # Maybe
             b1_rows, _ = sparse.coo_matrix(b1, dtype=sparse.coo_matrix).nonzero()
@@ -326,7 +331,7 @@ X.setdiag(np.ones(1), 1)
 
 if __name__ == '__main__':
     s = time.time()
-    n = 12
+    n = 8
 
     H = Hamiltonian(n)
     H.generate_data(40, 1, "train")
