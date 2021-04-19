@@ -1,6 +1,7 @@
 import os
 import sys
 import copy
+import tqdm
 import numpy as np
 import matplotlib.pyplot as plt 
 
@@ -32,25 +33,30 @@ def run_qcnn(train_data, labels, my_qcnn, unique_name):
     my_qcnn.initialize_params(random=True)
     initial_params = copy.deepcopy(my_qcnn.params)
 
+    if not os.path.isdir("results/" + unique_name):
+        os.mkdir("results/" + unique_name)
 
     # Create backup files
-    loss_file = f"/results/{unique_name}/Loss.txt"
-    acc_file = f"/results/{unique_name}/TrainingAccuracy.txt"
+    loss_file = f"./results/{unique_name}/Loss.txt"
+    param_file = f"./results/{unique_name}/Parameters.txt"
+    acc_file = f"./results/{unique_name}/TrainingAccuracy.txt"
+    if os.path.isfile(loss_file): os.remove(loss_file)
+    if os.path.isfile(acc_file): os.remove(acc_file)
+    if os.path.isfile(param_file): os.remove(param_file)
 
     batch_size = 100
     num_batches = len(train_data) // batch_size
-    num_epoches = 5
+    num_epoches = 250
     loss_lst = []  # initialize
     acc_lst = []
 
-    for batch_index in range(1, 3):
-    # for batch_index in range(1, num_batches + 1):
+    for batch_index in range(1, num_batches + 1):
         batched_data = train_data[(batch_index - 1)*batch_size: batch_index*batch_size]
         batched_labels = labels[(batch_index - 1)*batch_size: batch_index*batch_size]
         learning_rate = 100000  # intial value was 10 but this quantity doesn't learn fast enough !
         accuracy = 0
 
-        for epoch in range(1, num_epoches + 1):
+        for epoch in tqdm.tqdm(range(1, num_epoches + 1)):
             pred = my_qcnn.forward(batched_data, my_qcnn.params.copy())
             loss = my_qcnn.mse_loss(pred, batched_labels)
 
@@ -62,29 +68,34 @@ def run_qcnn(train_data, labels, my_qcnn, unique_name):
                     learning_rate /= 2  # if it gets bigger, decrease learning rate by 50%
 
             # grad_mat = my_qcnn.compute_grad(train_data, labels)
-            grad_mat = my_qcnn.compute_grad_w_mp(train_data, labels)  # with multi processing
-            my_qcnn.update_params(grad_mat, learning_rate)
+            grad_mat = my_qcnn.compute_grad_w_mp(batched_data, batched_labels)  # with multi processing
 
+            my_qcnn.update_params(grad_mat, learning_rate)
             loss_lst.append(loss)
+
             # Write to file each time to avoid saving to ram
             with open(loss_file, 'a+') as f:
                 f.write(str(loss) + "\n")
 
+        # Write to file each time to avoid saving to ram
+        with open(param_file, 'w+') as f:
+            tempCopy = copy.deepcopy(my_qcnn.params)
+            f.write(str(tempCopy) + "\n")
+
         for prediction, label in zip(pred, batched_labels):
             if np.round(prediction) == float(label):
                 accuracy += 1
+
         acc_lst.append(accuracy / batch_size)
-        with open(loss_file, 'a+') as f:
-            f.write(str(loss) + "\n")
+        with open(acc_file, 'a+') as f:
+            f.write(str(accuracy/batch_size) + "\n")
 
     # model end --------------------------------------------------------------------------------------------------------
 
-    if not os.path.isdir("results/" + unique_name):
-        os.mkdir("results/" + unique_name)
 
     optimal_params = copy.deepcopy(my_qcnn.params)
-    my_qcnn.export_params(my_qcnn.structure, optimal_params, fname=f'./results/{unique_name}model_optimal.pkl')
-    my_qcnn.export_params(my_qcnn.structure, initial_params, fname=f'./results/{unique_name}model_initial.pkl')
+    my_qcnn.export_params(my_qcnn.structure, optimal_params, fname=f'./results/{unique_name}/model_optimal.pkl')
+    my_qcnn.export_params(my_qcnn.structure, initial_params, fname=f'./results/{unique_name}/model_initial.pkl')
 
     # Loss plot:
     x_axis = range(len(loss_lst))
@@ -92,7 +103,7 @@ def run_qcnn(train_data, labels, my_qcnn, unique_name):
     plt.title('Training Loss over Epoches')
     plt.xlabel('Epoches')
     plt.ylabel("Loss")
-    plt.savefig(f"./results/{unique_name}loss.png")
+    plt.savefig(f"./results/{unique_name}/loss.png")
     plt.close()
 
     # Accuracy plot:
@@ -101,13 +112,13 @@ def run_qcnn(train_data, labels, my_qcnn, unique_name):
     plt.title('Training Accuracy over Batches')
     plt.xlabel('Batches')
     plt.ylabel("Accuracy")
-    plt.savefig(f"./results/{unique_name}acc.png")
+    plt.savefig(f"./results/{unique_name}/acc.png")
     plt.close()
 
     return my_qcnn
 
 
-def test_qcnn(test_input, test_labels, my_qcnn, fpath):
+def qcnn_test(test_input, test_labels, my_qcnn, fpath):
     file = open(fpath + 'loss_accuracy.txt', 'w')
     pred = my_qcnn.forward(test_input, my_qcnn.params.copy())
 
@@ -174,7 +185,7 @@ def og_model(num_qubits):
 
 def main():
     num_qubits = 8
-    unique_name = f"n{num_qubits}_digit_qcnn_train/"
+    unique_name = f"n{num_qubits}_digit_qcnn_train"
 
     wavefuncs_train, wavefuncs_test, labels_train, labels_test = get_wfs_from_images()
 
@@ -187,7 +198,7 @@ def main():
     trained_og_qcnn = run_qcnn(wavefuncs_train_subset, labels_train_subset, og_qcnn, "og_" + unique_name)
     # trained_new_qcnn = run_qcnn(wavefuncs_train_subset, labels_train_subset, new_qcnn, "new" + unique_name)
 
-    mse_loss, acc, pred = test_qcnn(wavefuncs_test, labels_test, trained_og_qcnn, "og_" + unique_name)
+    mse_loss, acc, pred = qcnn_test(wavefuncs_test, labels_test, trained_og_qcnn, "og_" + unique_name)
     # mse_loss, acc, pred = test_qcnn(wavefuncs_test, labels_test, trained_new_qcnn)
 
     print(mse_loss)
