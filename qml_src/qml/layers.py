@@ -311,10 +311,6 @@ def custom_conv_layer_fun(circ, params, active_qubits, barrier=True, kwargs={}):
     return
 
 
-def custom_pool_layer_fun(circ, params, active_qubits, barrier=True, kwargs={}):
-    return
-
-
 # Layer class ######################################################################
 class Layer:
 
@@ -345,10 +341,6 @@ def get_custom_conv_layer(group_size):
     layer_name = "custom_conv_layer_n{}".format(group_size)
     cc_layer = Layer(layer_name, custom_conv_layer_fun, (num_params,))
     return cc_layer
-
-
-def get_custom_pool_layer(num_active_qubits):
-    return
 
 
 # Base Legacy Layers #################################################################################################
