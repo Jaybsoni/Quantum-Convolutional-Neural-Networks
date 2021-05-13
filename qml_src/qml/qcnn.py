@@ -217,7 +217,7 @@ class Qcnn(QcnnStruct):
             state = self.embedding(wf)
             state = state.evolve(circ)          # evolve the wf according to the circuit
 
-            predictions[index] = self.middle_qubit_exp_value(state) # get predictions as expt_val of X of middle qubit
+            predictions[index] = self.middle_qubit_exp_value(state)  # get predictions as expt_val of X of middle qubit
 
         return predictions
 
@@ -231,7 +231,7 @@ class Qcnn(QcnnStruct):
         :param epsilon: float, the parameter shift in the finite differenc calculation
         :return: gradient_mat, list of np.arrays containing the rate of change of each parameter independantly
         """
-        original_params = copy.deepcopy(self.params) # copy original params to prevent potential loss of information
+        original_params = copy.deepcopy(self.params)  # copy original params to prevent potential loss of information
         gradient_mat = []
 
         for layer_index, layer_params in enumerate(self.params):  # iterate over each layer

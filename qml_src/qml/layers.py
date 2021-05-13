@@ -5,6 +5,15 @@ from qiskit import quantum_info as qi
 
 # Helper Functions ################################################
 def b_mat(i, j, n):
+    """
+    Generates an n x n matrix of 0s with the i,j th entry is a one.
+    This is the i,j th basis vector on the space of n x n real matricies
+
+    :param i: int, row index (must be < n)
+    :param j: int, column index (must be < n)
+    :param n: int, dimension of the matrices
+    :return: np.array of floats, shape (n,n)
+    """
     basis_matrix = np.zeros((n, n), dtype=np.float32)
     basis_matrix[i, j] = 1.0
 
@@ -12,6 +21,21 @@ def b_mat(i, j, n):
 
 
 def generate_gell_mann(order):
+    """
+    Generates a list of np.arrays which represent Gell Mann matricies of order 'order'.
+    eg: order = 2
+    lst_of_gm_matricies = [ [[0,  1],
+                             [1,  0]] ,
+
+                            [[0, -i]
+                             [i,  0]] ,
+
+                            [[1,  0],
+                             [0, -1]] ]
+    :param order: int, the order of Gell Mann matricies
+    :return: list of np.arrays, each array has shape (order, order), there are order^2 - 1 such elements in the lst
+    """
+
     lst_of_gm_matricies = []
     for k in range(order):
         j = 0
@@ -37,14 +61,30 @@ def generate_gell_mann(order):
 
 
 def get_conv_op(mats, parms):
+    """
+    The convolutional operator is parameterized according to
+    gell mann matricies scaled by trainable parameters, this method generates the operator as
+    defined in the paper.
+
+    eg. Convolutional operator = exp(-i * Sum_j(GM_j * theta_j) )
+    :param mats: lst of np.arrays which contain the self adjoint matricies used in the parameterization
+    :param parms: lst of floats which are the scale parameters
+    :return: np.array which represents the final convolutional operator
+    """
     final = np.zeros(mats[0].shape, dtype=np.complex128)
-    for mat, parm in zip(mats, parms):
+    for mat, parm in zip(mats, parms):  # sum over the gm matricies scaled by the parameters
         final += parm * mat
 
-    return la.expm(complex(0, -1) * final)
+    return la.expm(complex(0, -1) * final)  # get the matrix exponential of the final matrix
 
 
 def controlled_pool(mat):
+    """
+    Generate the matrix corresponding the controlled - mat operator.
+
+    :param mat: np.array, shape (2x2) for the controlled operator
+    :return: np.array, the final controlled-mat operator
+    """
     i_hat = np.array([[1.0, 0.0],
                       [0.0, 0.0]])
     j_hat = np.array([[0.0, 0.0],
