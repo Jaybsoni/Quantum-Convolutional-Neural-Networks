@@ -69,6 +69,7 @@ def extract_data(training_fname, test_fname):
 
     return h1h2_train, train_data, h1h2_test, test_data, labels
 
+
 def instanciate_original_model(num_qubits):
     my_qcnn = q.Qcnn(num_qubits)
 
@@ -100,8 +101,8 @@ def instanciate_new_model(num_qubits):
     legacy_fully_connected_layer = cl.get_legacy_fc_layer(num_qubits // 3)
     my_qcnn.Layers[legacy_fully_connected_layer.name] = legacy_fully_connected_layer
 
-    custom_fully_connected_layer = cl.get_custom_conv_layer(3)
-    my_qcnn.Layers[custom_fully_connected_layer.name] = custom_fully_connected_layer
+    custom_conv_layer = cl.get_custom_conv_layer(3)
+    my_qcnn.Layers[custom_conv_layer.name] = custom_conv_layer
 
     # def structure:
     my_qcnn.add_layer(my_qcnn.Layers["legacy_conv4_layer"], kwargs={"label": "C4_1"})
@@ -118,6 +119,7 @@ def instanciate_new_model(num_qubits):
     initial_params = copy.deepcopy(my_qcnn.params)
 
     return my_qcnn, initial_params
+
 
 def run_qcnn(unique_name, packaged_datasets, my_qcnn, initial_params):
     h1h2_train, train_data, h1h2_test, test_data, labels = packaged_datasets
