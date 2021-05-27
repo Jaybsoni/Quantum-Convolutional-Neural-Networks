@@ -184,8 +184,8 @@ def run_qcnn(unique_name, packaged_datasets, my_qcnn, initial_params):
 def main():
     num_qubits = 9
 
-    training_fname = f"../data_gen/dataset_n={num_qubits}_train.txt"
-    test_fname = f"../data_gen/dataset_n={num_qubits}_test.txt"
+    training_fname = f"./data_fldr/dataset_n={num_qubits}_train.txt"
+    test_fname = f"./data_fldr/dataset_n={num_qubits}_test.txt"
     packaged_datasets = extract_data(training_fname, test_fname)
 
     original_model, original_model_initial_params = instanciate_original_model(num_qubits)
