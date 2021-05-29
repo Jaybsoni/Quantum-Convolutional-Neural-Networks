@@ -101,10 +101,12 @@ class Hamiltonian:
             if self.verbose: print(f"third term {elem}/{self.qbits-1}")
 
             """
+            Ok... Here we go:
+            
             We want to take the dot product of B1 and B2, and subtract that value to 
             self.third term for each value of elem. Problem? The dot product is 
             a very inefficient operation for arrays that are sparse, both np.dot as 
-            well as sparse.dot(). So we had to find a way to do this faster!
+            well as sparse.dot(). So we had to find a way to do this faster.
             """
             b1 = find_kron(X, elem, self.qbits)
             b2 = find_kron(X, elem + 1, self.qbits)
@@ -119,9 +121,9 @@ class Hamiltonian:
             the dot product of these two matricies, the locations of the 1's on the 
             resultant 4x4 matrix is at the locations of the rows of the first matrix 
             with the column of the second matrix that has a 1 populated at the rowID 
-            that is the column of the 1 on the first matrix. Yeah. Hard to explain. 
+            that is the column of the 1 on the first matrix.
             """
-            # Maybe
+
             b1_rows, _ = sparse.coo_matrix(b1, dtype=sparse.coo_matrix).nonzero()
             # _, b2_cols = sparse.coo_matrix(b2, dtype=sparse.coo_matrix).nonzero()
 
@@ -144,14 +146,14 @@ class Hamiltonian:
             product instead of using sparse.dot() (which is pretty darn efficient already)
             """
             # This commented out section is what I'm trying to mimic with the above map and the below for loop
-            # b2_cols_slow = []  # Temp!
+            # b2_cols_slow = []
             # for val in b2_rows:
             #     # b2.getrow(val) is what makes this too slow
             #     b2_col = str(b2.getrow(val)).split(")")[0].split(" ")[-1]
             #     b2_cols_slow.append(int(b2_col))
             """
             If you were to print wrongly_ordered_B2_cols, and compare it to the B2_cols_slow
-            in the commented out section above, you'd they'd be contain the same row numbers
+            in the commented out section above, you'd see they contain the same row numbers
             (makes sense since theres the same number of rows and each only has a single 1
             in them), but the orders are different. This is because wrongly_ordered_B2_cols
             doesn't account for the swapping nature that kron applies to X (print B2 and
@@ -194,7 +196,7 @@ class Hamiltonian:
                 groups = [[a, b], [c, d], [e, f], [g, h], [i, j], [k, l]]
             so that we can swap them to
                 groups = [[d, e, f], [a, b, c], [j, k, l], [g, h, i]]
-                and
+            and
                 groups = [[c, d], [a, b], [g, h], [e, f], [k, l], [i, j]]
             respectively. If the chunks were smaller, and we had:
                 [[a], [b], [c], [d], [e], [f]]
@@ -223,8 +225,10 @@ class Hamiltonian:
             but much faster too. A trade off we desperately needed for high qbits 
             (anything larger than n=12, really)
             """
-            # The above code is over hundreds of times faster than using dot product (for n=10 I believe), don't
-            # have the energy
+            # The above code is over hundreds of times faster than using dot product,
+            # but in essence, the below  B1.dot(B2) is what we just replicated,
+            # but much more efficiently!
+
             # slow_method = B1.dot(B2)
             # assert np.array_equal(slow_method.toarray(), coo.toarray())
             self.third_term -= combined.toarray()
@@ -307,7 +311,6 @@ class Hamiltonian:
             eig_vect_list.append(np.array(temp_vec))
 
         sum_vec = np.sum(eig_vect_list, axis=0)
-
         return np_eig_val[0], sum_vec / np.linalg.norm(sum_vec)
 
     def test_dataset(self, h, possible_eigenvalue):
@@ -324,6 +327,7 @@ class Hamiltonian:
         assert np.allclose(magnitude, np.array(np_eig_vec, dtype=complex), 1e-9)
 
 
+# Define the various pauli operators required to compute the hamiltonian.
 II = sparse.dia_matrix((np.ones(2), np.array([0])), dtype=int, shape=(2, 2))
 Z = sparse.dia_matrix((np.array([1, -1]), np.array([0])), dtype=int, shape=(2, 2))
 X = sparse.dia_matrix((np.array([np.ones(1)]), np.array([-1])), dtype=int, shape=(2, 2))
