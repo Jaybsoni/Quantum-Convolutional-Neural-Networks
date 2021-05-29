@@ -331,16 +331,19 @@ X.setdiag(np.ones(1), 1)
 
 if __name__ == '__main__':
     s = time.time()
+
+    # n represents the number of qbits in the system. The larger the value,
+    # the more complicated and slower the calculations. Note that computation
+    # scales by 2^n, so anything larger than 9 or 10 starts to become
+    # exponentially long
     n = 9
 
+    # Create the hamiltonian and generate both train and test data sets
     H = Hamiltonian(n)
-    # H.generate_data(40, 1, "train")
-    H.generate_data(64, 64, "test")
-    print(H.third_term)
-    print(f"Time for creating dataset was {time.time() - s} seconds")
 
-    # time.sleep(1)
-    # import check_hamiltonian  # Verify
-    # # NOTE: This is SLOW for large (bigger than 7) n values. This is due to checking with numpy.
-    # check_hamiltonian.test_dataset(n, f"dataset_n={n}_train.txt", 1e-9)
-    # check_hamiltonian.test_dataset(n, f"dataset_n={n}_test.txt", 1e-9)
+    # Train data only requires 40x1 resolution
+    H.generate_data(40, 1, "train")
+
+    # Testing data is a 64x64 grid, as defined in the paper
+    H.generate_data(64, 64, "test")
+    print(f"Time for creating dataset was {time.time() - s} seconds")
