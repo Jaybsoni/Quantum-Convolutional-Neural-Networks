@@ -1,8 +1,17 @@
 # Quantum Convolutional Neural Networks for Phase Recognition
 ## Project Description 
+Quantum Convolutional Neural Networks (QCNNs) are a special class of variational quantum circuits which take inspiration from the convolution and pooling operations of classical CNNs. In this project we explore QCNNs for recognition of quantum phases of matter. This project follows the original paper[1] presented by Iris Cong and company ([original paper](https://arxiv.org/pdf/1810.03787.pdf)). The project deliverables are as follows: 
 
+**Quantum Machine Learning Module**: We constructed a custom QML module which allows users to create their own QCNNs with access to the original convolution and pooling layers mentioned in the paper (legacy layers) as well as a variety of customizable convolution and pooling layers. The core class and functions mirror those of popular ML frameworks (TF or pytorch) which make using the module easy and intuitive. 
+
+**Reproducing Results for Phase Recognition**: We were able to recreate the exact architecture used in the original paper[1] and show similar results for the phase prediction diagram; thus we were able to independantly validate the results of the study. 
+
+**Improving Unitary Parameterization**: We realized that the Gel Mann matrices based parameterization of the unitaries in the model used significantly more trainable parameters than the theoretical lower bound (total gm parameters = <img src="https://render.githubusercontent.com/render/math?math=2^{2n}-1"> v.s theoretical lower bound = <img src="https://render.githubusercontent.com/render/math?math=2^{n %2B 1}-2">). We found a paper[2] which presents an ansatz for quantum state preparation using uniformally controlled rotations. We used this as the basis of an alternate parameterization scheme with <img src="https://render.githubusercontent.com/render/math?math=2^{n %2B 2}-5"> total parameters. We then showed that this new scheme was able to achieve the same performance standards as the original model, now with fewer total parameters (thus faster training). In our particular case we realized a 8x reduction in total trainable parameters per 3 qubit convolutional layer
 
 ## Background 
+### QCNNs 
+
+### Distinguish Quantum Phases of Matter 
 
 
 ## Results 
@@ -14,7 +23,7 @@ The code for the project is split into 3 sections (data_gen, qml_src, and qml_fo
 
 _**data_gen**_: This folder contains code which generates our ground state wavefunctions for vary values of the coupling constants h1 and h2. It also makes the distinction between our training dataset and the testing dataset. The resultant text files that are produced here are moved into the qml_for_phase_recog folder to be processed. 
 
-_**qml_src**_: This folder contains our custom module which implements the abstract QCNN class and all of the varying layers used in the class! 
+_**qml_src**_: This folder contains our custom module which implements the abstract QCNN class and all of the varying layers used in the class! For additional information on using the module refer to the readme in this folder.
 
 _**qml_for_phase_recog**_: This folder imports the qml module and uses the data produced in data_gen to build the model and use the QCNN for the prescribed application.
 
