@@ -19,16 +19,17 @@ Where <img src="https://render.githubusercontent.com/render/math?math=\vec{\thet
 
 If we want an operator <img src="https://render.githubusercontent.com/render/math?math=\hat{U}"> which acts on k qubits, then we use the set of <img src="https://render.githubusercontent.com/render/math?math=2^{k}">'th order Gell Mann matricies. In general there are <img src="https://render.githubusercontent.com/render/math?math=(2^{k})^{2}-1"> such matricies. Since each matrix has an associated tuneable scale parameter, we have <img src="https://render.githubusercontent.com/render/math?math=(2^{k})^{2}-1"> trainable parameters per parameterized unitary operator. An alternate parameterization was found by adapting uniformly controlled rotations (ref [2]). This parameterization requires only <img src="https://render.githubusercontent.com/render/math?math=2^{k %2B 2}-5"> parameters per unitary operator. This new parameterization was also explored in our project. 
 
-#### Convolution Layer
-
-
-#### Pooling Layer
-
+#### Layers and Structure
+<img src="/images/Conv_layer_diagram.PNG">
+<img src="/images/pooling_layer_diagram.PNG">
+<img src="/images/QCNN_arc.PNG">
 
 ### Distinguish Quantum Phases of Matter 
+<img src="/images/paper_results.PNG">
 
 
 ## Results 
+<img src="/images/results_optimal_params.png"> 
 
 
 ## Code and Installation
