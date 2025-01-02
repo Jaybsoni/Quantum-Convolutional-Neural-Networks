@@ -41,7 +41,9 @@ With an understanding of the types of layers we can now present the architecture
 **Figure 3**: The QCNN architecture used in the original paper[1]. 
 
 ### Distinguish Quantum Phases of Matter 
-The authors present us with the following hamiltonian[1]: \n $\hat{H} = -J \sum_{i=1}^{n-2} (\hat{Z}_{i} \hat{X}_{i+1} \hat{Z}_{i+2} ) - h_{1}\sum_{i=1}^{n} (\hat{X}_{i}) - h_{2}\sum_{i=1}^{n-1} (\hat{X}_{i} \hat{X}_{i+1}) $
+The authors present us with the following hamiltonian[1]: 
+
+$\hat{H}=-J\sum_{i=1}^{n-2}(Z_{i} * X_{i+1} * Z_{i+2}) - h_{1}\sum_{i=1}^{n}(X_{i}) - h_{2}\sum_{i=1}^{n-1}(X_{i} * X_{i+1}) $
 
 It turns out that the ground state wave functions of this hamiltonian can exist in multiple states of matter depending on the coupling constants (J, h1, h2). Specifically, for certain values of the coupling constants the states can exist in a symmetry protected topological phase (SPT phase) with Z2 x Z2 symmetry. Other states of matter include the paramagnetic state and the anti-ferromagnetic state. The question is then, can a QCNN determine which state of matter a ground state wave function belongs to? 
 
